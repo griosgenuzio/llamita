@@ -1,0 +1,12 @@
+{
+  "name": "llamita",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Parqueos en La Paz — mapa en vivo para conductores y panel para operadores",
+  "scripts": {
+    "start": "node server/server.js"
+  },
+  "engines": {
+    "node": ">=22.5"
+  }
+}
