@@ -50,6 +50,12 @@
       invalid_email: 'Correo no válido.',
       weak_password: 'La contraseña debe tener al menos 6 caracteres.',
       name_required: 'Ingresa tu nombre.',
+      invalid_code: 'Código incorrecto. Revisa tu correo e intenta de nuevo.',
+      code_expired: 'El código expiró. Vuelve a crear tu cuenta para recibir uno nuevo.',
+      too_many_attempts: 'Demasiados intentos. Vuelve a crear tu cuenta para recibir un código nuevo.',
+      verification_not_found: 'La verificación expiró. Vuelve a crear tu cuenta.',
+      resend_too_soon: 'Espera un minuto antes de pedir otro código.',
+      email_send_failed: 'No se pudo enviar el correo de verificación. Verifica el correo e intenta de nuevo.',
     };
     return map[e && e.message] || 'No se pudo conectar con el servidor. Intenta de nuevo.';
   }

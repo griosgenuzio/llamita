@@ -85,18 +85,37 @@ function localSignUp({ email, password, name, role, phone, business }) {
   return { user: session };
 }
 
+// With the backend available, signUp no longer creates the account directly:
+// the server emails a 6-digit code and returns { pending, verifyId }. The
+// account is created by verifyEmail(). Offline fallback keeps the old
+// immediate behaviour (no email possible without a server).
 function signUp(fields) {
   return window.LlamitaApi.ready.then((ok) => {
     if (!ok) return localSignUp(fields);
     return window.LlamitaApi.req('POST', '/api/auth/signup', fields)
       .then((j) => {
-        window.LlamitaApi.setToken(j.token);
-        startSession(j.user);
-        track('user_signed_up', { role: j.user.role });
-        return { user: j.user };
+        track('signup_code_sent', { role: fields.role });
+        return { pending: true, verifyId: j.verifyId, email: j.email, smtp: j.smtp };
       })
       .catch((e) => ({ error: window.LlamitaApi.errorMessage(e) }));
   });
+}
+
+function verifyEmail(verifyId, code) {
+  return window.LlamitaApi.req('POST', '/api/auth/verify-email', { verifyId, code })
+    .then((j) => {
+      window.LlamitaApi.setToken(j.token);
+      startSession(j.user);
+      track('user_signed_up', { role: j.user.role });
+      return { user: j.user };
+    })
+    .catch((e) => ({ error: window.LlamitaApi.errorMessage(e), code: e && e.message }));
+}
+
+function resendCode(verifyId) {
+  return window.LlamitaApi.req('POST', '/api/auth/resend-code', { verifyId })
+    .then(() => ({ ok: true }))
+    .catch((e) => ({ error: window.LlamitaApi.errorMessage(e), code: e && e.message }));
 }
 
 function signOut() {
@@ -192,8 +211,22 @@ function AuthScreen() {
   const [business, setBusiness] = React.useState('');
   const [err, setErr] = React.useState(null);
   const [loading, setLoading] = React.useState(false);
+  // Email-verification step (mode 'verify'): shown after signup when the
+  // server emailed a 6-digit code.
+  const [verifyId, setVerifyId] = React.useState(null);
+  const [pendingEmail, setPendingEmail] = React.useState('');
+  const [smtpOn, setSmtpOn] = React.useState(true);
+  const [code, setCode] = React.useState('');
+  const [resendWait, setResendWait] = React.useState(0);
+  const [notice, setNotice] = React.useState(null);
 
-  const reset = () => { setErr(null); };
+  React.useEffect(() => {
+    if (resendWait <= 0) return;
+    const t = setTimeout(() => setResendWait(w => w - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendWait]);
+
+  const reset = () => { setErr(null); setNotice(null); };
 
   const onSignIn = (e) => {
     e && e.preventDefault();
@@ -213,7 +246,51 @@ function AuthScreen() {
     setLoading(true);
     signUp({ email, password, name, role, phone, business }).then((res) => {
       setLoading(false);
-      if (res.error) setErr(res.error);
+      if (res.error) { setErr(res.error); return; }
+      if (res.pending) {
+        setVerifyId(res.verifyId);
+        setPendingEmail(res.email);
+        setSmtpOn(res.smtp !== false);
+        setCode('');
+        setResendWait(60);
+        setMode('verify');
+        reset();
+      }
+    });
+  };
+
+  const onVerify = (e) => {
+    e && e.preventDefault();
+    const clean = code.replace(/\D/g, '');
+    if (clean.length !== 6) { setErr('Ingresa el código de 6 dígitos.'); return; }
+    setLoading(true);
+    verifyEmail(verifyId, clean).then((res) => {
+      setLoading(false);
+      if (res.error) {
+        setErr(res.error);
+        // These states can't be retried with the same code — go back to the form.
+        if (['code_expired', 'too_many_attempts', 'verification_not_found'].includes(res.code)) {
+          setMode('signup');
+          setVerifyId(null);
+        }
+      }
+      // On success startSession() re-renders the app past the auth screen.
+    });
+  };
+
+  const onResend = () => {
+    if (resendWait > 0 || loading) return;
+    reset();
+    setLoading(true);
+    resendCode(verifyId).then((res) => {
+      setLoading(false);
+      if (res.error) {
+        setErr(res.error);
+        if (res.code === 'verification_not_found') { setMode('signup'); setVerifyId(null); }
+        return;
+      }
+      setResendWait(60);
+      setNotice(smtpOn ? 'Código reenviado. Revisa tu correo.' : 'Código nuevo generado. Revisa la consola del servidor.');
     });
   };
 
@@ -350,7 +427,7 @@ function AuthScreen() {
           </div>
 
           {/* tab toggle */}
-          <div style={{
+          {mode !== 'verify' && <div style={{
             display: 'flex', gap: 0, padding: 3, borderRadius: 10,
             background: 'color-mix(in oklch, var(--c-border) 40%, transparent)',
             marginBottom: 22,
@@ -365,7 +442,7 @@ function AuthScreen() {
                 boxShadow: mode === k ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
               }}>{l}</button>
             ))}
-          </div>
+          </div>}
 
           {mode === 'signin' && (
             <form onSubmit={onSignIn} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -439,6 +516,71 @@ function AuthScreen() {
             </form>
           )}
 
+          {mode === 'verify' && (
+            <form onSubmit={onVerify} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{
+                width: 44, height: 44, borderRadius: 12,
+                background: 'color-mix(in oklch, var(--c-accent) 12%, var(--c-surface))',
+                border: '1px solid var(--c-border)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
+              }}>✉️</div>
+              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: '-0.01em' }}>Verifica tu correo</h2>
+              <p style={{ margin: '-6px 0 0', fontSize: 13, color: 'var(--c-muted)', lineHeight: 1.6 }}>
+                Enviamos un código de 6 dígitos a{' '}
+                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--c-text)' }}>{pendingEmail}</span>.
+                Ingrésalo para activar tu cuenta. Expira en 10 minutos.
+              </p>
+              {!smtpOn && (
+                <div style={{
+                  padding: '8px 12px', borderRadius: 8, fontSize: 12, lineHeight: 1.5,
+                  background: 'color-mix(in oklch, var(--c-accent) 8%, var(--c-surface))',
+                  border: '1px solid var(--c-border)', color: 'var(--c-muted)',
+                }}>
+                  Modo desarrollo: el servidor no tiene SMTP configurado, el código aparece en la consola del servidor.
+                </div>
+              )}
+              <AField label="Código de verificación" error={err}>
+                <input
+                  value={code}
+                  onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="000000"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  autoFocus
+                  style={{
+                    padding: '12px 12px', borderRadius: 8,
+                    border: '1px solid var(--c-border)', background: 'var(--c-surface)',
+                    fontFamily: 'var(--font-mono)', fontSize: 22, letterSpacing: '0.35em',
+                    textAlign: 'center', color: 'var(--c-text)', outline: 'none',
+                  }}
+                  onFocus={e => e.target.style.borderColor = 'var(--c-accent)'}
+                  onBlur={e => e.target.style.borderColor = 'var(--c-border)'}
+                />
+              </AField>
+              {notice && <div style={{ fontSize: 12, color: 'var(--c-accent)' }}>{notice}</div>}
+              <AButton type="submit" disabled={loading || code.length !== 6}>
+                {loading ? 'Verificando…' : 'Verificar y crear cuenta →'}
+              </AButton>
+              <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--c-muted)' }}>
+                ¿No llegó el correo?{' '}
+                <a href="#" onClick={e => { e.preventDefault(); onResend(); }} style={{
+                  color: resendWait > 0 ? 'var(--c-muted)' : 'var(--c-accent)',
+                  textDecoration: 'none', fontWeight: 500,
+                  cursor: resendWait > 0 ? 'default' : 'pointer',
+                }}>
+                  {resendWait > 0 ? `Reenviar código (${resendWait}s)` : 'Reenviar código'}
+                </a>
+              </div>
+              <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--c-muted)' }}>
+                ¿Correo equivocado?{' '}
+                <a href="#" onClick={e => { e.preventDefault(); setMode('signup'); setVerifyId(null); reset(); }}
+                   style={{ color: 'var(--c-accent)', textDecoration: 'none', fontWeight: 500 }}>
+                  Volver al registro
+                </a>
+              </div>
+            </form>
+          )}
+
         </div>
       </div>
 
@@ -452,4 +594,4 @@ function AuthScreen() {
   );
 }
 
-window.LlamitaAuth = { useSession, signIn, signUp, signOut, getSession, getAccounts, AuthScreen };
+window.LlamitaAuth = { useSession, signIn, signUp, verifyEmail, resendCode, signOut, getSession, getAccounts, AuthScreen };
