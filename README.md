@@ -18,7 +18,19 @@ Variables de entorno opcionales: `PORT`, `LLAMITA_DB`, `LLAMITA_ADMIN_EMAIL`, `L
 
 Al crear una cuenta, el servidor envía un código de 6 dígitos al correo ingresado y la cuenta solo se crea cuando el usuario confirma el código (expira en 10 minutos, máximo 5 intentos, reenvío cada 60 s).
 
-Para enviar correos reales configura SMTP con variables de entorno:
+El correo se envía por uno de dos caminos, con Brevo como prioritario:
+
+### Opción A — Brevo (API HTTP, recomendada)
+
+Usa el puerto 443, así que funciona en hosts que bloquean SMTP saliente (como Railway). Crea una cuenta gratis en [brevo.com](https://www.brevo.com), verifica un remitente y genera una API key:
+
+| Variable | Descripción |
+|---|---|
+| `LLAMITA_BREVO_API_KEY` | API key transaccional de Brevo |
+| `LLAMITA_BREVO_SENDER` | correo remitente **verificado** en Brevo |
+| `LLAMITA_BREVO_NAME` | nombre visible del remitente (por defecto `Llamita`) |
+
+### Opción B — SMTP
 
 | Variable | Descripción |
 |---|---|
@@ -28,7 +40,7 @@ Para enviar correos reales configura SMTP con variables de entorno:
 | `LLAMITA_SMTP_PASS` | contraseña SMTP (en Gmail: una "contraseña de aplicación", no la normal) |
 | `LLAMITA_SMTP_FROM` | remitente (por defecto igual a `LLAMITA_SMTP_USER`) |
 
-Sin estas variables el servidor funciona en **modo desarrollo**: imprime el código en la consola del servidor en vez de enviarlo por correo (la pantalla de verificación lo avisa).
+Sin ninguna de las dos opciones el servidor funciona en **modo desarrollo**: imprime el código en la consola del servidor en vez de enviarlo por correo (la pantalla de verificación lo avisa).
 
 ## Ejecutar sin servidor (modo demo)
 

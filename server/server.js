@@ -11,8 +11,16 @@
 //   LLAMITA_ADMIN_EMAIL     platform-owner login         (default admin@llamita.bo)
 //   LLAMITA_ADMIN_PASSWORD  platform-owner password      (default llamita2026 — CHANGE IN PRODUCTION)
 //
-// Email verification (SMTP) — without these, verification codes are printed
-// to this console instead of emailed (development mode):
+// Email verification — codes are sent via Brevo's HTTP API (preferred; works
+// on hosts that block outbound SMTP, e.g. Railway) or SMTP. With neither
+// configured, codes are printed to this console instead (development mode).
+//
+//   Brevo HTTP API (recommended):
+//   LLAMITA_BREVO_API_KEY   transactional API key from brevo.com
+//   LLAMITA_BREVO_SENDER    verified sender email (e.g. tucorreo@gmail.com)
+//   LLAMITA_BREVO_NAME      sender display name          (default "Llamita")
+//
+//   SMTP (fallback):
 //   LLAMITA_SMTP_HOST       e.g. smtp.gmail.com
 //   LLAMITA_SMTP_PORT       465 = TLS directo, otherwise STARTTLS (default 587)
 //   LLAMITA_SMTP_USER       SMTP login (e.g. tucorreo@gmail.com)
@@ -34,6 +42,13 @@ const ADMIN_EMAIL = (process.env.LLAMITA_ADMIN_EMAIL || 'admin@llamita.bo').toLo
 const ADMIN_PASSWORD = process.env.LLAMITA_ADMIN_PASSWORD || 'llamita2026';
 const MAX_EVENTS = 20000;
 
+const BREVO = {
+  apiKey: process.env.LLAMITA_BREVO_API_KEY || '',
+  sender: process.env.LLAMITA_BREVO_SENDER || '',
+  name: process.env.LLAMITA_BREVO_NAME || 'Llamita',
+};
+const BREVO_ENABLED = Boolean(BREVO.apiKey && BREVO.sender);
+
 const SMTP = {
   host: process.env.LLAMITA_SMTP_HOST || '',
   port: Number(process.env.LLAMITA_SMTP_PORT) || 587,
@@ -42,6 +57,9 @@ const SMTP = {
   from: process.env.LLAMITA_SMTP_FROM || process.env.LLAMITA_SMTP_USER || '',
 };
 const SMTP_ENABLED = Boolean(SMTP.host && SMTP.user && SMTP.pass);
+
+// True when the server can actually deliver mail (vs. dev-mode console print).
+const MAIL_ENABLED = BREVO_ENABLED || SMTP_ENABLED;
 const CODE_TTL_MS = 10 * 60 * 1000;   // verification code lifetime
 const RESEND_COOLDOWN_MS = 60 * 1000; // min. gap between emails to one signup
 const MAX_CODE_ATTEMPTS = 5;
@@ -227,19 +245,40 @@ function smtpSend(to, subject, text) {
   });
 }
 
-// Emails the code, or prints it to the console when SMTP isn't configured.
-async function sendVerificationCode(email, code) {
-  if (!SMTP_ENABLED) {
-    console.log(`[llamita] Código de verificación para ${email}: ${code}  (SMTP no configurado — modo desarrollo)`);
-    return;
+// Sends mail through Brevo's transactional HTTP API. Uses port 443, so it
+// works on hosts that block outbound SMTP (e.g. Railway). Node 18+ fetch.
+async function brevoSend(to, subject, text) {
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'api-key': BREVO.apiKey,
+      'Content-Type': 'application/json',
+      'accept': 'application/json',
+    },
+    body: JSON.stringify({
+      sender: { email: BREVO.sender, name: BREVO.name },
+      to: [{ email: to }],
+      subject,
+      textContent: text,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`brevo_${res.status}: ${body.slice(0, 200)}`);
   }
-  await smtpSend(
-    email,
-    'Tu código de verificación de Llamita',
+}
+
+// Emails the verification code via Brevo or SMTP, or — when neither is
+// configured — prints it to the console (development mode).
+async function sendVerificationCode(email, code) {
+  const subject = 'Tu código de verificación de Llamita';
+  const text =
     `Hola,\n\nTu código de verificación de Llamita es:\n\n    ${code}\n\n` +
     `Ingresa este código en la pantalla de registro para activar tu cuenta. ` +
-    `Expira en 10 minutos.\n\nSi no creaste una cuenta en Llamita, ignora este correo.\n\n— Llamita · Parqueos en La Paz`
-  );
+    `Expira en 10 minutos.\n\nSi no creaste una cuenta en Llamita, ignora este correo.\n\n— Llamita · Parqueos en La Paz`;
+  if (BREVO_ENABLED) return brevoSend(email, subject, text);
+  if (SMTP_ENABLED)  return smtpSend(email, subject, text);
+  console.log(`[llamita] Código de verificación para ${email}: ${code}  (email no configurado — modo desarrollo)`);
 }
 
 // Returns { id, name, role } for a valid Bearer token, else null.
@@ -324,7 +363,7 @@ async function handleApi(req, res, pathname) {
                 VALUES (?,?,?,?,?,0,?,?,?)`)
       .run(verifyId, email, hashCode(code, codeSalt), codeSalt, JSON.stringify(payload),
            new Date(Date.now() + CODE_TTL_MS).toISOString(), nowIso(), nowIso());
-    return json(res, 200, { pending: true, verifyId, email, smtp: SMTP_ENABLED });
+    return json(res, 200, { pending: true, verifyId, email, smtp: MAIL_ENABLED });
   }
 
   if (pathname === '/api/auth/verify-email' && method === 'POST') {
@@ -378,7 +417,7 @@ async function handleApi(req, res, pathname) {
                 expires_at = ?, last_sent_at = ? WHERE id = ?`)
       .run(hashCode(code, codeSalt), codeSalt,
            new Date(Date.now() + CODE_TTL_MS).toISOString(), nowIso(), row.id);
-    return json(res, 200, { ok: true, smtp: SMTP_ENABLED });
+    return json(res, 200, { ok: true, smtp: MAIL_ENABLED });
   }
 
   if (pathname === '/api/auth/signin' && method === 'POST') {
@@ -511,7 +550,8 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => {
   console.log(`Llamita server listo → http://localhost:${PORT}`);
   console.log(`Base de datos: ${DB_PATH}`);
-  console.log(SMTP_ENABLED
-    ? `Verificación de correo: SMTP vía ${SMTP.host}:${SMTP.port}`
-    : 'Verificación de correo: SMTP no configurado — los códigos se imprimen en esta consola (modo desarrollo)');
+  console.log(
+    BREVO_ENABLED ? `Verificación de correo: Brevo API (remitente ${BREVO.sender})`
+    : SMTP_ENABLED ? `Verificación de correo: SMTP vía ${SMTP.host}:${SMTP.port}`
+    : 'Verificación de correo: sin configurar — los códigos se imprimen en esta consola (modo desarrollo)');
 });
