@@ -12,19 +12,19 @@
     'font:600 13px/1.4 -apple-system,sans-serif!important;color:#111!important;' +
     'box-shadow:0 2px 10px rgba(0,0,0,.12)!important;white-space:nowrap!important}' +
     '.leaflet-tooltip.llamita-tt::before{display:none!important}' +
-    // Permanent count label sitting beside each marker (free spaces / LLENO).
-    '.llamita-lbl{background:#fff!important;border:1px solid rgba(0,0,0,.12)!important;' +
-    'border-radius:999px!important;padding:1px 7px!important;' +
-    'font:700 11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace!important;color:#111!important;' +
-    'box-shadow:0 1px 4px rgba(0,0,0,.18)!important;white-space:nowrap!important}' +
-    '.llamita-lbl .lbl-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;vertical-align:middle}' +
+    // Permanent count label beside each marker — a bare, transparent container;
+    // the coloured pill is the inline-styled inner span (colour set per lot).
+    '.llamita-lbl{background:transparent!important;border:none!important;padding:0!important;' +
+    'box-shadow:none!important;font:700 11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace!important;' +
+    'white-space:nowrap!important}' +
     '.leaflet-tooltip.llamita-lbl::before{display:none!important}' +
     '.leaflet-control-attribution{font-size:9px!important}';
   document.head.appendChild(s);
 }());
 
-var AVAIL = '#27AE60';
-var FULL  = '#E74C3C';
+var AVAIL = '#27AE60'; // 5+ free
+var LOW   = '#E67E22'; // 1–4 free
+var FULL  = '#E74C3C'; // 0 free (LLENO)
 
 function LeafletParkingMap({ lots, selectedId, onSelect, filterFn, pulseLotId }) {
   var containerRef = React.useRef(null);
@@ -51,23 +51,23 @@ function LeafletParkingMap({ lots, selectedId, onSelect, filterFn, pulseLotId })
       // hides the marker; filterFn below merely fades, so the gate must be here.)
       if (!lot.lat || !lot.lng || lot.status !== 'approved') return;
 
-      var full       = lot.occupied >= lot.total;
+      var free       = Math.max(0, lot.total - lot.occupied);
+      var full       = free === 0;
       var isSelected = lot.id === sel;
       var visible    = fn ? fn(lot) : true;
-      var color      = full ? FULL : AVAIL;
+      // Colour by availability: green (5+), orange (1–4), red/LLENO (0).
+      var tone       = full ? FULL : (free < 5 ? LOW : AVAIL);
       var radius     = isSelected ? 14 : 10;
       var opacity    = visible ? 0.92 : 0.20;
-      var avail      = Math.max(0, lot.total - lot.occupied);
 
-      // Persistent compact label beside each marker: a colour dot + free-space
-      // count (or LLENO when full). Name stays on the list / selection card.
-      var label = full
-        ? '<span class="lbl-dot" style="background:' + FULL + '"></span><b style="color:' + FULL + '">LLENO</b>'
-        : '<span class="lbl-dot" style="background:' + AVAIL + '"></span><b>' + avail + '</b>';
+      // Coloured pill beside the marker: the free-space count, or LLENO.
+      var label =
+        '<span style="background:' + tone + ';color:#fff;padding:2px 8px;border-radius:999px;' +
+        'display:inline-block;box-shadow:0 1px 4px rgba(0,0,0,.28)">' + (full ? 'LLENO' : free) + '</span>';
 
       var style = {
         radius:      radius,
-        fillColor:   color,
+        fillColor:   tone,
         color:       '#ffffff',
         weight:      isSelected ? 4 : 3,
         opacity:     1,
