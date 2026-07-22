@@ -279,9 +279,12 @@ var DEFAULT_LOT_FORM = {
 
 function CreateLotDrawer({ pendingLatLng, onSave, onCancel, onChange }) {
   var [form, setForm] = React.useState(DEFAULT_LOT_FORM);
+  var [photoIds, setPhotoIds] = React.useState([]);
+  var [photoErr, setPhotoErr] = React.useState(null);
   var set = function(patch) { setForm(function(f) { return Object.assign({}, f, patch); }); };
 
   var step = pendingLatLng ? 'form' : 'place';
+  var canSave = form.name.trim() && form.address.trim() && photoIds.length >= 3;
 
   return (
     <div style={{
@@ -375,6 +378,15 @@ function CreateLotDrawer({ pendingLatLng, onSave, onCancel, onChange }) {
             </div>
 
             <div style={{ paddingTop: 10, borderTop: '1px solid #f5f5f5' }}>
+              <div style={{ fontWeight: 600, fontSize: 12, color: '#111', marginBottom: 4 }}>Fotos del parqueo *</div>
+              <div style={{ fontSize: 11, color: '#999', marginBottom: 10, lineHeight: 1.5 }}>
+                Sube al menos 3 fotos reales del espacio (entrada, espacios, señalización). Un administrador las revisará antes de publicar el parqueo.
+              </div>
+              <LotPhotos value={photoIds} onChange={setPhotoIds} onError={function(c) { setPhotoErr(window.LlamitaApi.errorMessage({ message: c })); }} />
+              {photoErr && <div style={{ color: '#c0392b', fontSize: 11, marginTop: 6 }}>{photoErr}</div>}
+            </div>
+
+            <div style={{ paddingTop: 10, borderTop: '1px solid #f5f5f5' }}>
               <div style={{ fontWeight: 600, fontSize: 12, color: '#111', marginBottom: 10 }}>Tarifas iniciales</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                 <div>
@@ -398,8 +410,8 @@ function CreateLotDrawer({ pendingLatLng, onSave, onCancel, onChange }) {
       {step === 'form' && (
         <div style={{ padding: '12px 16px', borderTop: '1px solid #f0f0f0', display: 'flex', gap: 8 }}>
           <Btn variant="ghost" onClick={onCancel} fullWidth>Cancelar</Btn>
-          <Btn variant="accent" onClick={function() { onSave(form); }} disabled={!form.name.trim() || !form.address.trim()} fullWidth>
-            Guardar parqueo
+          <Btn variant="accent" onClick={function() { onSave(Object.assign({}, form, { photoIds: photoIds })); }} disabled={!canSave} fullWidth>
+            Enviar a revisión
           </Btn>
         </div>
       )}
@@ -418,13 +430,16 @@ function MapSection({ store, lots, lot, onSelectLot, session }) {
   function cancelCreate() { setCreating(false); setPendingLatLng(null); }
 
   function handleSave(form) {
+    var photoIds = form.photoIds || [];
     var newId = addLot({
       ownerId: session.id,
       name: form.name, address: form.address,
       lat: pendingLatLng.lat, lng: pendingLatLng.lng,
       total: form.total, occupied: 0,
       terrain: form.terrain, covered: form.covered, keyRequired: form.keyRequired,
-      security: form.security, hours: form.hours, payment: form.payment, photos: 0,
+      security: form.security, hours: form.hours, payment: form.payment,
+      photoIds: photoIds, photos: photoIds.length,
+      status: 'pending', // server assigns the authoritative status on push
       fees: { firstHour: form.firstHour, addHour: form.addHour, weekendMult: 1, peakMult: 1, peakHours: '', dailyCap: form.dailyCap },
     });
     cancelCreate();
@@ -464,7 +479,10 @@ function MapSection({ store, lots, lot, onSelectLot, session }) {
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: isFull ? '#E74C3C' : '#27AE60', flexShrink: 0 }}/>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: '#111', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.name}</div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#aaa' }}>{isFull ? 'LLENO' : avail + '/' + l.total + ' libres'}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                    <LotStatusPill status={l.status} />
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#aaa' }}>{isFull ? 'LLENO' : avail + '/' + l.total + ' libres'}</span>
+                  </div>
                 </div>
                 {pulseLotId === l.id && <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--c-accent)', animation: 'llamita-blink 1s infinite' }}/>}
               </button>
@@ -980,6 +998,244 @@ function OwnerUserMenu({ session, onSignOut }) {
   );
 }
 
+// ─── Verification: photo upload primitives ───────────────────────────────────
+
+function extFromType(t) {
+  return t === 'image/png' ? 'png' : t === 'image/webp' ? 'webp' : t === 'image/jpeg' ? 'jpg' : '';
+}
+
+// Downscales an image to ≤1600px, re-encoded as JPEG, to keep the storage
+// volume small. Falls back to the original file on any error.
+function processImage(file) {
+  return new Promise(function(resolve) {
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) { resolve({ error: 'unsupported_type' }); return; }
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function() {
+      try {
+        var max = 1600;
+        var scale = Math.min(1, max / Math.max(img.width, img.height));
+        var w = Math.max(1, Math.round(img.width * scale));
+        var h = Math.max(1, Math.round(img.height * scale));
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        canvas.toBlob(function(blob) {
+          URL.revokeObjectURL(url);
+          if (blob && blob.size > 0) resolve({ blob: blob, ext: 'jpg' });
+          else resolve({ blob: file, ext: extFromType(file.type) });
+        }, 'image/jpeg', 0.82);
+      } catch (e) {
+        URL.revokeObjectURL(url);
+        resolve({ blob: file, ext: extFromType(file.type) });
+      }
+    };
+    img.onerror = function() { URL.revokeObjectURL(url); resolve({ error: 'unsupported_type' }); };
+    img.src = url;
+  });
+}
+
+// A single labelled photo slot: uploads on pick, shows a preview + state.
+function DocUpload({ label, hint, purpose, value, onUploaded, onError }) {
+  var [busy, setBusy] = React.useState(false);
+  var [preview, setPreview] = React.useState(null);
+  React.useEffect(function() { return function() { if (preview) URL.revokeObjectURL(preview); }; }, [preview]);
+  function pick(e) {
+    var file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    setBusy(true);
+    processImage(file).then(function(r) {
+      if (r.error) { setBusy(false); onError && onError(r.error); return; }
+      setPreview(function(old) { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(r.blob); });
+      return window.LlamitaApi.upload(r.blob, { purpose: purpose, ext: r.ext }).then(function(res) {
+        setBusy(false); onUploaded(res.id);
+      });
+    }).catch(function(err) { setBusy(false); onError && onError((err && err.message) || 'error'); });
+  }
+  var done = !!value;
+  return (
+    <label style={{
+      display: 'block', border: '1px dashed ' + (done ? 'var(--c-accent)' : '#ccc'),
+      borderRadius: 10, padding: 10, cursor: 'pointer', background: done ? 'rgba(45,143,94,0.05)' : '#fafafa',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{
+          width: 46, height: 46, borderRadius: 8, background: '#eee', flexShrink: 0,
+          backgroundImage: preview ? 'url(' + preview + ')' : 'none', backgroundSize: 'cover', backgroundPosition: 'center',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
+        }}>{preview ? '' : '📷'}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#111' }}>{label}</div>
+          <div style={{ fontSize: 10, color: done ? 'var(--c-accent)' : '#999', marginTop: 2 }}>
+            {busy ? 'Subiendo…' : done ? '✓ Subido — toca para cambiar' : (hint || 'JPG, PNG o WEBP')}
+          </div>
+        </div>
+      </div>
+      <input type="file" accept="image/jpeg,image/png,image/webp" onChange={pick} style={{ display: 'none' }} />
+    </label>
+  );
+}
+
+// A previously-uploaded photo shown as a thumbnail (fetched with the auth header).
+function PhotoThumb({ id, onRemove }) {
+  var [url, setUrl] = React.useState(null);
+  React.useEffect(function() {
+    var alive = true; var made = null;
+    window.LlamitaApi.uploadUrl(id).then(function(u) { if (alive) { made = u; setUrl(u); } else URL.revokeObjectURL(u); }).catch(function() {});
+    return function() { alive = false; if (made) URL.revokeObjectURL(made); };
+  }, [id]);
+  return (
+    <div style={{ position: 'relative', width: 56, height: 56, borderRadius: 8, overflow: 'hidden', background: '#eee', flexShrink: 0 }}>
+      {url && <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+      {onRemove && <button onClick={onRemove} style={{
+        position: 'absolute', top: 2, right: 2, width: 16, height: 16, borderRadius: '50%',
+        border: 'none', background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 10, cursor: 'pointer', lineHeight: 1,
+      }}>×</button>}
+    </div>
+  );
+}
+
+// Multiple lot photos (minimum 3). Manages an array of uploaded ids.
+function LotPhotos({ value, onChange, onError }) {
+  return (
+    <div>
+      {value.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+          {value.map(function(id, i) {
+            return <PhotoThumb key={id} id={id} onRemove={function() { onChange(value.filter(function(_, j) { return j !== i; })); }} />;
+          })}
+        </div>
+      )}
+      <DocUpload key={'add-' + value.length} label="Agregar foto del parqueo" hint="Entrada, espacios, señalización…"
+        purpose="lot_photo" value={null} onUploaded={function(id) { onChange(value.concat([id])); }} onError={onError} />
+      <div style={{ fontSize: 10, color: value.length >= 3 ? '#27AE60' : '#E67E22', marginTop: 6 }}>
+        {value.length}/3 fotos mínimas {value.length >= 3 ? '✓' : ''}
+      </div>
+    </div>
+  );
+}
+
+// Small pill showing a lot's verification state in the operator's own list.
+function LotStatusPill({ status }) {
+  var map = {
+    approved: { t: 'En vivo',     c: '#27AE60', bg: 'rgba(39,174,96,0.1)' },
+    pending:  { t: 'En revisión', c: '#E67E22', bg: 'rgba(230,126,34,0.12)' },
+    rejected: { t: 'Rechazado',   c: '#E74C3C', bg: 'rgba(231,76,60,0.1)' },
+  };
+  var m = map[status || 'pending'] || map.pending;
+  return <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, fontWeight: 700, letterSpacing: '0.05em', color: m.c, background: m.bg, padding: '1px 5px', borderRadius: 4, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{m.t}</span>;
+}
+
+// Polls /api/me so an operator's pending→approved transition appears without
+// a re-login. Seeds from the stored session snapshot.
+function useMyVerifStatus(sess) {
+  var [status, setStatus] = React.useState((sess && sess.verifStatus) || 'unsubmitted');
+  var [rejectReason, setRejectReason] = React.useState((sess && sess.verifRejectReason) || null);
+  React.useEffect(function() {
+    if (!sess || sess.role !== 'operador') return;
+    var alive = true;
+    function poll() {
+      if (!window.LlamitaApi || !window.LlamitaApi.isAvailable()) return;
+      window.LlamitaApi.req('GET', '/api/me').then(function(r) {
+        if (!alive || !r.user) return;
+        setStatus(r.user.verifStatus || 'unsubmitted');
+        setRejectReason(r.user.verifRejectReason || null);
+      }).catch(function() {});
+    }
+    poll();
+    var id = setInterval(poll, 8000);
+    return function() { alive = false; clearInterval(id); };
+  }, [sess && sess.id, sess && sess.role]);
+  return {
+    status: status, rejectReason: rejectReason,
+    setLocal: function(u) { setStatus((u && u.verifStatus) || 'pending'); setRejectReason((u && u.verifRejectReason) || null); },
+  };
+}
+
+// Full-screen gate shown to operators until an admin approves their identity.
+function OperatorVerificationGate({ session, status, rejectReason, onSubmitted, onSignOut }) {
+  var [docs, setDocs] = React.useState({ id_front: null, id_back: null, selfie: null, business: null });
+  var [phone, setPhone] = React.useState(session.phone || '');
+  var [business, setBusiness] = React.useState(session.business || session.name || '');
+  var [err, setErr] = React.useState(null);
+  var [saving, setSaving] = React.useState(false);
+  function setDoc(k, id) { setDocs(function(d) { var n = Object.assign({}, d); n[k] = id; return n; }); }
+  var docErr = function(c) { setErr(window.LlamitaApi.errorMessage({ message: c })); };
+  var ready = docs.id_front && docs.id_back && docs.selfie && docs.business && phone.trim() && !saving;
+
+  function submit() {
+    setSaving(true); setErr(null);
+    window.LlamitaApi.req('POST', '/api/operator/verification', {
+      idFront: docs.id_front, idBack: docs.id_back, selfie: docs.selfie, businessDoc: docs.business,
+      phone: phone, business: business,
+    }).then(function(res) { setSaving(false); onSubmitted(res.user); })
+      .catch(function(e) { setSaving(false); setErr(window.LlamitaApi.errorMessage(e)); });
+  }
+
+  var pending = status === 'pending';
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--c-bg)', fontFamily: 'var(--font-sans)', color: '#111' }}>
+      <div style={{ padding: '11px 20px', borderBottom: '1px solid #eee', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 26, height: 26, borderRadius: 7, background: 'var(--c-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, color: '#fff' }}>L</div>
+          <span style={{ fontWeight: 700, fontSize: 14 }}>llamita</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.1em', marginLeft: 2 }}>operador</span>
+        </div>
+        <OwnerUserMenu session={session} onSignOut={onSignOut || function() {}} />
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', justifyContent: 'center' }}>
+        <div style={{ width: '100%', maxWidth: 520, padding: '32px 20px' }}>
+          {pending ? (
+            <div style={{ textAlign: 'center', paddingTop: 40 }}>
+              <div style={{ fontSize: 44, marginBottom: 14 }}>🕓</div>
+              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Verificación en revisión</h2>
+              <p style={{ color: '#777', fontSize: 14, lineHeight: 1.6, marginTop: 12 }}>
+                Recibimos tus documentos. Revisaremos tu identidad y te habilitaremos para publicar parqueos. Esta pantalla se actualizará automáticamente cuando seas aprobado.
+              </p>
+            </div>
+          ) : (
+            <React.Fragment>
+              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Verifica tu identidad</h2>
+              <p style={{ color: '#777', fontSize: 14, lineHeight: 1.6, marginTop: 8 }}>
+                Para publicar parqueos necesitamos confirmar quién eres. Es un paso único y tus documentos son privados: solo el equipo de Llamita los ve.
+              </p>
+              {status === 'rejected' && rejectReason && (
+                <div style={{ marginTop: 14, padding: '10px 12px', borderRadius: 8, background: 'rgba(231,76,60,0.08)', border: '1px solid rgba(231,76,60,0.3)', fontSize: 12, color: '#c0392b' }}>
+                  Tu verificación fue rechazada: {rejectReason}. Corrige y vuelve a enviar.
+                </div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 18 }}>
+                <DocUpload label="Carnet de identidad — anverso" hint="Foto del frente de tu CI" purpose="id_front" value={docs.id_front} onUploaded={function(id) { setDoc('id_front', id); }} onError={docErr} />
+                <DocUpload label="Carnet de identidad — reverso" hint="Foto del reverso de tu CI" purpose="id_back" value={docs.id_back} onUploaded={function(id) { setDoc('id_back', id); }} onError={docErr} />
+                <DocUpload label="Selfie sosteniendo tu CI" hint="Tu rostro junto a tu documento" purpose="selfie" value={docs.selfie} onUploaded={function(id) { setDoc('selfie', id); }} onError={docErr} />
+                <DocUpload label="Documento del negocio (NIT / razón social)" hint="NIT o registro del parqueo" purpose="business" value={docs.business} onUploaded={function(id) { setDoc('business', id); }} onError={docErr} />
+                <div>
+                  <FieldLabel>Teléfono de contacto *</FieldLabel>
+                  <Input value={phone} onChange={setPhone} placeholder="+591 700 12 345" />
+                </div>
+                <div>
+                  <FieldLabel>Razón social / nombre del negocio</FieldLabel>
+                  <Input value={business} onChange={setBusiness} placeholder="Parqueos Centro SRL" />
+                </div>
+              </div>
+              {err && <div style={{ color: '#c0392b', fontSize: 12, marginTop: 12 }}>{err}</div>}
+              <div style={{ marginTop: 18 }}>
+                <Btn variant="accent" onClick={submit} disabled={!ready} fullWidth>
+                  {saving ? 'Enviando…' : 'Enviar para verificación'}
+                </Btn>
+              </div>
+              <div style={{ fontSize: 11, color: '#aaa', textAlign: 'center', marginTop: 12 }}>
+                Formatos: JPG, PNG o WEBP · máx. 8 MB por imagen
+              </div>
+            </React.Fragment>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Owner App ───────────────────────────────────────────────────────────────
 
 function OwnerApp({ store, session, onSignOut }) {
@@ -988,6 +1244,10 @@ function OwnerApp({ store, session, onSignOut }) {
   var date = displayDate();
   var sess = session || { name: 'Operador', email: '—', initials: 'OP', role: 'operador' };
   var handleSignOut = onSignOut || function() {};
+
+  // Identity verification: operators can't reach the dashboard until approved.
+  var verif = useMyVerifStatus(sess);
+  var apiUp = !!(window.LlamitaApi && window.LlamitaApi.isAvailable());
 
   // Owners only manage their own lots; the shared driver map shows everyone's.
   var myLots = lots.filter(function(l) { return l.ownerId === sess.id; });
@@ -1004,6 +1264,17 @@ function OwnerApp({ store, session, onSignOut }) {
   React.useEffect(function() {
     try { window.LlamitaAnalytics.trackSessionStart({ view: 'operador', ownLots: myLots.length }); } catch (e) {}
   }, []);
+
+  // Gate: unverified operators (server-backed only) see the verification flow,
+  // not the dashboard. Runs after all hooks above so hook order stays stable.
+  if (apiUp && sess.role === 'operador' && verif.status !== 'approved') {
+    return (
+      <OperatorVerificationGate
+        session={sess} status={verif.status} rejectReason={verif.rejectReason}
+        onSubmitted={function(u) { verif.setLocal(u); }} onSignOut={handleSignOut}
+      />
+    );
+  }
 
   var tabs = [
     { id: 'operaciones', label: 'Operaciones',      icon: 'M3 12h4l3 8 4-16 3 8h4' },

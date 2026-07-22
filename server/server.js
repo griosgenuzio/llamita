@@ -64,6 +64,16 @@ const CODE_TTL_MS = 10 * 60 * 1000;   // verification code lifetime
 const RESEND_COOLDOWN_MS = 60 * 1000; // min. gap between emails to one signup
 const MAX_CODE_ATTEMPTS = 5;
 
+// Verification uploads (operator ID docs + lot photos). Files live on disk
+// beside the DB (the Railway volume); only references are stored in SQLite.
+const UPLOAD_DIR = process.env.LLAMITA_UPLOADS || path.join(path.dirname(DB_PATH), 'uploads');
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;             // per photo
+const UPLOAD_PURPOSES = ['id_front', 'id_back', 'selfie', 'business', 'lot_photo'];
+const MIN_LOT_PHOTOS = 3;
+// One-time data wipe: set LLAMITA_RESET_DATA to a unique token to erase all
+// users/lots/events on next boot. Idempotent per token value (runs once).
+const RESET_TOKEN = process.env.LLAMITA_RESET_DATA || '';
+
 // ─────────── Database ───────────
 const db = new DatabaseSync(DB_PATH);
 db.exec(`
@@ -111,9 +121,84 @@ db.exec(`
     meta      TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_events_ts ON events (ts);
+  -- Uploaded verification media (id docs, selfies, lot photos). Bytes live on
+  -- disk at UPLOAD_DIR/<id>.<ext>; this table only tracks ownership + metadata.
+  CREATE TABLE IF NOT EXISTS uploads (
+    id         TEXT PRIMARY KEY,
+    owner_id   TEXT NOT NULL,
+    purpose    TEXT NOT NULL,
+    ext        TEXT NOT NULL,
+    mime       TEXT NOT NULL,
+    bytes      INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_uploads_owner ON uploads (owner_id);
+  -- Server-authoritative per-lot verification. This — not the app_state blob —
+  -- is the source of truth for whether a lot may appear on the driver map.
+  CREATE TABLE IF NOT EXISTS lot_verifications (
+    lot_id       TEXT PRIMARY KEY,
+    owner_id     TEXT NOT NULL,
+    status       TEXT NOT NULL,          -- pending | approved | rejected
+    address      TEXT,
+    photo_ids    TEXT NOT NULL DEFAULT '[]',
+    submitted_at TEXT NOT NULL,
+    reviewed_at  TEXT,
+    reviewed_by  TEXT,
+    reject_reason TEXT
+  );
+  CREATE TABLE IF NOT EXISTS system_meta (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
 `);
 db.prepare(`INSERT OR IGNORE INTO app_state (id, version, data)
             VALUES (1, 0, '{"lots":[],"sessions":[],"history":[]}')`).run();
+
+// ─────────── Schema migration (no framework — guarded ALTER TABLE) ───────────
+// Adds operator-verification columns to an existing `users` table. Safe to run
+// repeatedly: only adds a column when it isn't already present.
+(function migrateUsers() {
+  const cols = new Set(db.prepare('PRAGMA table_info(users)').all().map(c => c.name));
+  const add = (name, decl) => { if (!cols.has(name)) db.exec(`ALTER TABLE users ADD COLUMN ${name} ${decl}`); };
+  add('verif_status', "TEXT NOT NULL DEFAULT 'unsubmitted'"); // unsubmitted|pending|approved|rejected
+  add('verif_submitted_at', 'TEXT');
+  add('verif_reviewed_at', 'TEXT');
+  add('verif_reviewed_by', 'TEXT');
+  add('verif_reject_reason', 'TEXT');
+  add('id_front_upload', 'TEXT');
+  add('id_back_upload', 'TEXT');
+  add('selfie_upload', 'TEXT');
+  add('business_upload', 'TEXT');
+})();
+
+// ─────────── One-time data reset (LLAMITA_RESET_DATA) ───────────
+// Wipes all accounts, lots, events and uploaded media. Runs at most once per
+// distinct token value, so leaving the env var set won't re-wipe future data.
+(function maybeResetData() {
+  if (!RESET_TOKEN) return;
+  const applied = db.prepare("SELECT value FROM system_meta WHERE key = 'reset_token'").get();
+  if (applied && applied.value === RESET_TOKEN) return;
+  db.exec(`
+    DELETE FROM users;
+    DELETE FROM tokens;
+    DELETE FROM pending_signups;
+    DELETE FROM events;
+    DELETE FROM uploads;
+    DELETE FROM lot_verifications;
+    UPDATE app_state SET version = 0, data = '{"lots":[],"sessions":[],"history":[]}' WHERE id = 1;
+  `);
+  try {
+    if (fs.existsSync(UPLOAD_DIR)) {
+      for (const f of fs.readdirSync(UPLOAD_DIR)) { try { fs.unlinkSync(path.join(UPLOAD_DIR, f)); } catch (e) {} }
+    }
+  } catch (e) {}
+  db.prepare(`INSERT INTO system_meta (key, value) VALUES ('reset_token', ?)
+              ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(RESET_TOKEN);
+  console.log(`[llamita] LLAMITA_RESET_DATA aplicado (token ${RESET_TOKEN}): datos borrados, empezando de cero.`);
+})();
+
+// Ensure the upload directory exists.
+try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch (e) {}
 
 // ─────────── Helpers ───────────
 const uid = (p) => `${p}-${Date.now().toString(36)}-${crypto.randomBytes(4).toString('hex')}`;
@@ -127,6 +212,8 @@ function publicUser(row) {
     id: row.id, email: row.email, name: row.name, role: row.role,
     initials: row.initials, phone: row.phone, business: row.business,
     createdAt: row.created_at ? row.created_at.slice(0, 10) : '',
+    verifStatus: row.verif_status || 'unsubmitted',
+    verifRejectReason: row.verif_reject_reason || null,
   };
 }
 
@@ -319,6 +406,37 @@ function readBody(req) {
   });
 }
 
+// Reads a raw (non-JSON) request body into a Buffer, rejecting mid-stream once
+// maxBytes is exceeded. Used for image uploads (readBody would JSON-parse and
+// hard-cap at 2 MB).
+function readRawUpload(req, maxBytes) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks = [];
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > maxBytes) { reject(new Error('upload_too_large')); req.destroy(); return; }
+      chunks.push(c);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
+
+// Confirms a buffer really is the image type its extension claims (magic bytes),
+// returning the MIME type or null. Blocks a renamed script/video masquerading
+// as a photo.
+function sniffImage(buf, ext) {
+  if (buf.length < 12) return null;
+  const jpg  = buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF;
+  const png  = buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47;
+  const webp = buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP';
+  if ((ext === 'jpg' || ext === 'jpeg') && jpg) return 'image/jpeg';
+  if (ext === 'png' && png) return 'image/png';
+  if (ext === 'webp' && webp) return 'image/webp';
+  return null;
+}
+
 // ─────────── API routes ───────────
 async function handleApi(req, res, pathname) {
   const method = req.method;
@@ -441,6 +559,158 @@ async function handleApi(req, res, pathname) {
     return json(res, 200, { ok: true });
   }
 
+  // Current account incl. live verification status — the operator UI polls this
+  // to transition pending → approved without re-login.
+  if (pathname === '/api/me' && method === 'GET') {
+    const who = authFrom(req);
+    if (!who) return json(res, 401, { error: 'unauthorized' });
+    if (who.id === 'admin') {
+      return json(res, 200, { user: { id: 'admin', email: ADMIN_EMAIL, name: 'Administración Llamita', role: 'admin', initials: 'AD', verifStatus: 'approved', verifRejectReason: null } });
+    }
+    const row = db.prepare('SELECT * FROM users WHERE id = ?').get(who.id);
+    if (!row) return json(res, 404, { error: 'not_found' });
+    return json(res, 200, { user: publicUser(row) });
+  }
+
+  // Upload one image. Purpose + extension in the query string; raw bytes as body.
+  if (pathname === '/api/uploads' && method === 'POST') {
+    const who = authFrom(req);
+    if (!who) return json(res, 401, { error: 'unauthorized' });
+    const q = new URL(req.url, 'http://x').searchParams;
+    const purpose = String(q.get('purpose') || '');
+    const ext = String(q.get('ext') || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!UPLOAD_PURPOSES.includes(purpose)) return json(res, 400, { error: 'unsupported_type' });
+    if (!['jpg', 'jpeg', 'png', 'webp'].includes(ext)) return json(res, 400, { error: 'unsupported_type' });
+    // Reject oversized uploads by Content-Length before reading the body — a
+    // clean 413 rather than a mid-stream socket reset. readRawUpload is the
+    // backstop for chunked requests that omit the header.
+    if (Number(req.headers['content-length'] || 0) > MAX_IMAGE_BYTES) {
+      return json(res, 413, { error: 'upload_too_large' });
+    }
+    const buf = await readRawUpload(req, MAX_IMAGE_BYTES);
+    const mime = sniffImage(buf, ext);
+    if (!mime) return json(res, 400, { error: 'unsupported_type' });
+    const id = uid('up');
+    fs.writeFileSync(path.join(UPLOAD_DIR, `${id}.${ext}`), buf);
+    db.prepare('INSERT INTO uploads (id,owner_id,purpose,ext,mime,bytes,created_at) VALUES (?,?,?,?,?,?,?)')
+      .run(id, who.id, purpose, ext, mime, buf.length, nowIso());
+    return json(res, 201, { id, bytes: buf.length });
+  }
+
+  // Serve an uploaded image — auth-gated (ID docs are private PII).
+  if (pathname.startsWith('/api/uploads/') && method === 'GET') {
+    const who = authFrom(req);
+    if (!who) return json(res, 401, { error: 'unauthorized' });
+    const upId = pathname.slice('/api/uploads/'.length);
+    if (!/^[a-z0-9-]+$/i.test(upId)) return json(res, 400, { error: 'bad_id' });
+    const row = db.prepare('SELECT * FROM uploads WHERE id = ?').get(upId);
+    if (!row) return json(res, 404, { error: 'not_found' });
+    if (who.role !== 'admin' && row.owner_id !== who.id) return json(res, 403, { error: 'forbidden' });
+    const file = path.join(UPLOAD_DIR, `${row.id}.${row.ext}`);
+    if (!file.startsWith(UPLOAD_DIR)) return json(res, 403, { error: 'forbidden' });
+    let data;
+    try { data = fs.readFileSync(file); } catch (e) { return json(res, 404, { error: 'not_found' }); }
+    res.writeHead(200, { 'Content-Type': row.mime, 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'private, max-age=300' });
+    res.end(data);
+    return;
+  }
+
+  // Operator submits identity docs for review (metadata only — the images were
+  // uploaded separately via /api/uploads). Moves the account to `pending`.
+  if (pathname === '/api/operator/verification' && method === 'POST') {
+    const who = authFrom(req);
+    if (!who || who.role !== 'operador') return json(res, 403, { error: 'forbidden' });
+    const row = db.prepare('SELECT * FROM users WHERE id = ?').get(who.id);
+    if (!row) return json(res, 404, { error: 'not_found' });
+    if (row.verif_status === 'pending' || row.verif_status === 'approved') {
+      return json(res, 409, { error: 'verification_already_submitted' });
+    }
+    const b = await readBody(req);
+    const phone = String(b.phone || '').trim();
+    const business = String(b.business || '').trim();
+    const need = { id_front: b.idFront, id_back: b.idBack, selfie: b.selfie, business: b.businessDoc };
+    const ids = {};
+    for (const [purpose, upId] of Object.entries(need)) {
+      const u = db.prepare('SELECT * FROM uploads WHERE id = ?').get(String(upId || ''));
+      if (!u || u.owner_id !== who.id || u.purpose !== purpose) {
+        return json(res, 400, { error: 'invalid_verification_docs' });
+      }
+      ids[purpose] = u.id;
+    }
+    if (!phone) return json(res, 400, { error: 'phone_required' });
+    db.prepare(`UPDATE users SET verif_status='pending', verif_submitted_at=?, verif_reject_reason=NULL,
+                phone=?, business=?, id_front_upload=?, id_back_upload=?, selfie_upload=?, business_upload=? WHERE id=?`)
+      .run(nowIso(), phone, business || row.business || null,
+           ids.id_front, ids.id_back, ids.selfie, ids.business, who.id);
+    return json(res, 200, { user: publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(who.id)) });
+  }
+
+  // ── Admin review queues ──
+  if (pathname === '/api/admin/operators/pending' && method === 'GET') {
+    const who = authFrom(req);
+    if (!who || who.role !== 'admin') return json(res, 403, { error: 'forbidden' });
+    const rows = db.prepare("SELECT * FROM users WHERE verif_status = 'pending' ORDER BY verif_submitted_at ASC").all();
+    return json(res, 200, { operators: rows.map(r => Object.assign(publicUser(r), {
+      submittedAt: r.verif_submitted_at,
+      docs: { idFront: r.id_front_upload, idBack: r.id_back_upload, selfie: r.selfie_upload, business: r.business_upload },
+    })) });
+  }
+
+  if (pathname === '/api/admin/lots/pending' && method === 'GET') {
+    const who = authFrom(req);
+    if (!who || who.role !== 'admin') return json(res, 403, { error: 'forbidden' });
+    const rows = db.prepare("SELECT * FROM lot_verifications WHERE status = 'pending' ORDER BY submitted_at ASC").all();
+    const state = JSON.parse(db.prepare('SELECT data FROM app_state WHERE id = 1').get().data);
+    const lotById = {}; for (const l of state.lots) lotById[l.id] = l;
+    return json(res, 200, { lots: rows.map(r => {
+      const lot = lotById[r.lot_id] || {};
+      const owner = db.prepare('SELECT name, email, phone FROM users WHERE id = ?').get(r.owner_id) || {};
+      return {
+        lotId: r.lot_id, ownerId: r.owner_id, ownerName: owner.name || '', ownerEmail: owner.email || '', ownerPhone: owner.phone || '',
+        name: lot.name || '(sin nombre)', address: r.address || lot.address || '',
+        lat: lot.lat, lng: lot.lng, total: lot.total,
+        photoIds: JSON.parse(r.photo_ids || '[]'), submittedAt: r.submitted_at,
+      };
+    }) });
+  }
+
+  {
+    const m = /^\/api\/admin\/operator\/([^/]+)\/(approve|reject)$/.exec(pathname);
+    if (m && method === 'POST') {
+      const who = authFrom(req);
+      if (!who || who.role !== 'admin') return json(res, 403, { error: 'forbidden' });
+      const [, opId, action] = m;
+      const b = await readBody(req);
+      if (!db.prepare('SELECT id FROM users WHERE id = ?').get(opId)) return json(res, 404, { error: 'not_found' });
+      const status = action === 'approve' ? 'approved' : 'rejected';
+      db.prepare(`UPDATE users SET verif_status=?, verif_reviewed_at=?, verif_reviewed_by=?, verif_reject_reason=? WHERE id=?`)
+        .run(status, nowIso(), who.id, action === 'reject' ? String(b.reason || 'Sin especificar') : null, opId);
+      return json(res, 200, { ok: true, status });
+    }
+  }
+
+  {
+    const m = /^\/api\/admin\/lot\/([^/]+)\/(approve|reject)$/.exec(pathname);
+    if (m && method === 'POST') {
+      const who = authFrom(req);
+      if (!who || who.role !== 'admin') return json(res, 403, { error: 'forbidden' });
+      const [, lotId, action] = m;
+      const b = await readBody(req);
+      if (!db.prepare('SELECT lot_id FROM lot_verifications WHERE lot_id = ?').get(lotId)) return json(res, 404, { error: 'not_found' });
+      const status = action === 'approve' ? 'approved' : 'rejected';
+      db.prepare(`UPDATE lot_verifications SET status=?, reviewed_at=?, reviewed_by=?, reject_reason=? WHERE lot_id=?`)
+        .run(status, nowIso(), who.id, action === 'reject' ? String(b.reason || 'Sin especificar') : null, lotId);
+      // Patch the app_state blob so drivers see the change on their next 4 s pull
+      // (without waiting for the operator client to push again).
+      const stateRow = db.prepare('SELECT version, data FROM app_state WHERE id = 1').get();
+      const state = JSON.parse(stateRow.data);
+      let changed = false;
+      state.lots = state.lots.map(l => (l.id === lotId ? (changed = true, Object.assign({}, l, { status })) : l));
+      if (changed) db.prepare('UPDATE app_state SET version = ?, data = ? WHERE id = 1').run(stateRow.version + 1, JSON.stringify(state));
+      return json(res, 200, { ok: true, status });
+    }
+  }
+
   if (pathname === '/api/state' && method === 'GET') {
     const row = db.prepare('SELECT version, data FROM app_state WHERE id = 1').get();
     return json(res, 200, { version: row.version, state: JSON.parse(row.data) });
@@ -456,10 +726,50 @@ async function handleApi(req, res, pathname) {
     if (!s || !Array.isArray(s.lots) || !Array.isArray(s.sessions) || !Array.isArray(s.history)) {
       return json(res, 400, { error: 'invalid_state' });
     }
+    // Whether this operator may create new lots at all.
+    let opApproved = who.role === 'admin';
+    if (who.role === 'operador') {
+      const u = db.prepare('SELECT verif_status FROM users WHERE id = ?').get(who.id);
+      opApproved = !!u && u.verif_status === 'approved';
+    }
+    // Reconcile each lot against the authoritative lot_verifications table:
+    // a client-supplied `status` is never trusted — it's re-derived here. A lot
+    // id we've never seen is a new submission and must pass the gate.
+    const lots = [];
+    for (const lot of s.lots) {
+      if (!lot || typeof lot.id !== 'string') continue;
+      let lv = db.prepare('SELECT status FROM lot_verifications WHERE lot_id = ?').get(lot.id);
+      if (!lv) {
+        if (who.role === 'operador') {
+          if (!opApproved) return json(res, 403, { error: 'operator_unverified' });
+          const photoIds = Array.isArray(lot.photoIds) ? lot.photoIds : [];
+          const address = String(lot.address || '').trim();
+          const validPhotos = photoIds.filter(pid => {
+            const up = db.prepare('SELECT owner_id, purpose FROM uploads WHERE id = ?').get(String(pid));
+            return up && up.owner_id === who.id && up.purpose === 'lot_photo';
+          });
+          if (validPhotos.length < MIN_LOT_PHOTOS || !address) {
+            return json(res, 400, { error: 'invalid_lot_submission' });
+          }
+          db.prepare(`INSERT INTO lot_verifications (lot_id,owner_id,status,address,photo_ids,submitted_at)
+                      VALUES (?,?,?,?,?,?)`)
+            .run(lot.id, who.id, 'pending', address, JSON.stringify(validPhotos), nowIso());
+          lv = { status: 'pending' };
+        } else {
+          // Admin-created lots are trusted (auto-approved).
+          db.prepare(`INSERT INTO lot_verifications (lot_id,owner_id,status,address,photo_ids,submitted_at,reviewed_at,reviewed_by)
+                      VALUES (?,?,?,?,?,?,?,?)`)
+            .run(lot.id, lot.ownerId || 'admin', 'approved', String(lot.address || ''),
+                 JSON.stringify(Array.isArray(lot.photoIds) ? lot.photoIds : []), nowIso(), nowIso(), 'admin');
+          lv = { status: 'approved' };
+        }
+      }
+      lots.push(Object.assign({}, lot, { status: lv.status }));
+    }
     const row = db.prepare('SELECT version FROM app_state WHERE id = 1').get();
     const version = row.version + 1;
     db.prepare('UPDATE app_state SET version = ?, data = ? WHERE id = 1')
-      .run(version, JSON.stringify({ lots: s.lots, sessions: s.sessions, history: s.history }));
+      .run(version, JSON.stringify({ lots, sessions: s.sessions, history: s.history }));
     return json(res, 200, { version });
   }
 
@@ -506,6 +816,7 @@ const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.jsx': 'text/javascript',
   '.css': 'text/css', '.woff2': 'font/woff2', '.png': 'image/png', '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon', '.json': 'application/json',
+  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp',
 };
 
 function serveStatic(req, res, pathname) {
@@ -537,8 +848,9 @@ const server = http.createServer((req, res) => {
 
   if (pathname.startsWith('/api/')) {
     handleApi(req, res, pathname).catch(e => {
-      json(res, e.message === 'body_too_large' ? 413 : e.message === 'invalid_json' ? 400 : 500,
-           { error: e.message || 'server_error' });
+      const code = (e.message === 'body_too_large' || e.message === 'upload_too_large') ? 413
+                 : e.message === 'invalid_json' ? 400 : 500;
+      json(res, code, { error: e.message || 'server_error' });
     });
     return;
   }

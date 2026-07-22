@@ -42,6 +42,33 @@
     });
   }
 
+  // Uploads one image file (raw bytes) to /api/uploads. `meta` = {purpose, ext}.
+  // Bypasses req() because that path forces JSON; here we send the File as body.
+  function upload(file, meta) {
+    var t = token();
+    var headers = {};
+    if (t) headers['Authorization'] = 'Bearer ' + t;
+    var qs = '?purpose=' + encodeURIComponent(meta.purpose) + '&ext=' + encodeURIComponent(meta.ext);
+    return fetch(BASE + '/api/uploads' + qs, { method: 'POST', headers: headers, body: file })
+      .then(function(r) {
+        return r.json().catch(function() { return {}; }).then(function(j) {
+          if (!r.ok) { var err = new Error(j.error || ('http_' + r.status)); err.status = r.status; throw err; }
+          return j; // { id, bytes }
+        });
+      });
+  }
+
+  // Fetches a private upload with the auth header and returns an object URL
+  // (usable as <img src>). Caller should revoke it when done.
+  function uploadUrl(id) {
+    var t = token();
+    var headers = {};
+    if (t) headers['Authorization'] = 'Bearer ' + t;
+    return fetch(BASE + '/api/uploads/' + encodeURIComponent(id), { headers: headers })
+      .then(function(r) { if (!r.ok) throw new Error('http_' + r.status); return r.blob(); })
+      .then(function(b) { return URL.createObjectURL(b); });
+  }
+
   // Server error codes → user-facing Spanish messages.
   function errorMessage(e) {
     var map = {
@@ -56,6 +83,13 @@
       verification_not_found: 'La verificación expiró. Vuelve a crear tu cuenta.',
       resend_too_soon: 'Espera un minuto antes de pedir otro código.',
       email_send_failed: 'No se pudo enviar el correo de verificación. Verifica el correo e intenta de nuevo.',
+      upload_too_large: 'La imagen es demasiado grande (máximo 8 MB).',
+      unsupported_type: 'Formato no admitido. Usa JPG, PNG o WEBP.',
+      invalid_verification_docs: 'Faltan documentos o no son válidos. Vuelve a subirlos.',
+      phone_required: 'Ingresa un número de teléfono.',
+      verification_already_submitted: 'Ya enviaste tu verificación; está en revisión.',
+      operator_unverified: 'Tu cuenta de operador aún no está verificada.',
+      invalid_lot_submission: 'Sube al menos 3 fotos y una dirección para publicar el parqueo.',
     };
     return map[e && e.message] || 'No se pudo conectar con el servidor. Intenta de nuevo.';
   }
@@ -73,6 +107,8 @@
     ready: ready,
     isAvailable: function() { return available === true; },
     req: req,
+    upload: upload,
+    uploadUrl: uploadUrl,
     token: token,
     setToken: setToken,
     errorMessage: errorMessage,

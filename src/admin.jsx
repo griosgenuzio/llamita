@@ -141,10 +141,152 @@ function RolePill({ role }) {
   );
 }
 
+// Pending verification queues (operators + lots), polled from the server.
+function useVerifications() {
+  var [data, setData] = React.useState({ operators: [], lots: [] });
+  var pull = React.useCallback(function() {
+    if (!window.LlamitaApi || !window.LlamitaApi.isAvailable()) return;
+    Promise.all([
+      window.LlamitaApi.req('GET', '/api/admin/operators/pending').catch(function() { return { operators: [] }; }),
+      window.LlamitaApi.req('GET', '/api/admin/lots/pending').catch(function() { return { lots: [] }; }),
+    ]).then(function(res) {
+      setData({ operators: res[0].operators || [], lots: res[1].lots || [] });
+    });
+  }, []);
+  React.useEffect(function() {
+    var stopped = false, timer = null;
+    try { window.LlamitaApi.ready.then(function(ok) { if (!ok || stopped) return; pull(); timer = setInterval(pull, 10000); }); } catch (e) {}
+    return function() { stopped = true; clearInterval(timer); };
+  }, [pull]);
+  return { operators: data.operators, lots: data.lots, refresh: pull };
+}
+
+function reviewOperator(id, action, reason) {
+  return window.LlamitaApi.req('POST', '/api/admin/operator/' + encodeURIComponent(id) + '/' + action, reason ? { reason: reason } : {});
+}
+function reviewLot(id, action, reason) {
+  return window.LlamitaApi.req('POST', '/api/admin/lot/' + encodeURIComponent(id) + '/' + action, reason ? { reason: reason } : {});
+}
+
+// A private upload rendered as a thumbnail (fetched with the admin's auth
+// header); clicking opens it full-size in a new tab.
+function AdmPhoto({ id, label, size }) {
+  var [url, setUrl] = React.useState(null);
+  React.useEffect(function() {
+    if (!id) { setUrl(null); return; }
+    var alive = true, made = null;
+    window.LlamitaApi.uploadUrl(id).then(function(u) { if (alive) { made = u; setUrl(u); } else URL.revokeObjectURL(u); }).catch(function() {});
+    return function() { alive = false; if (made) URL.revokeObjectURL(made); };
+  }, [id]);
+  var s = size || 84;
+  return (
+    <a href={url || '#'} target="_blank" rel="noreferrer" onClick={function(e) { if (!url) e.preventDefault(); }} style={{ display: 'block', textDecoration: 'none' }}>
+      <div style={{ width: s, height: s, borderRadius: 8, background: '#f0f0f0', overflow: 'hidden', border: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {url ? <img src={url} alt={label || ''} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 10, color: '#bbb' }}>…</span>}
+      </div>
+      {label && <div style={{ fontSize: 9, color: '#999', marginTop: 3, textAlign: 'center' }}>{label}</div>}
+    </a>
+  );
+}
+
+function AdmReviewBtns({ busyKey, onApprove, onReject }) {
+  return (
+    <div style={{ display: 'flex', gap: 8 }}>
+      <button onClick={onApprove} disabled={!!busyKey} style={{
+        padding: '7px 14px', borderRadius: 8, border: 'none', background: 'var(--c-accent)', color: '#fff',
+        fontSize: 12, fontWeight: 600, cursor: busyKey ? 'default' : 'pointer', fontFamily: 'var(--font-sans)', opacity: busyKey ? 0.6 : 1,
+      }}>✓ Aprobar</button>
+      <button onClick={onReject} disabled={!!busyKey} style={{
+        padding: '7px 14px', borderRadius: 8, border: '1px solid #E74C3C', background: '#fff', color: '#E74C3C',
+        fontSize: 12, fontWeight: 600, cursor: busyKey ? 'default' : 'pointer', fontFamily: 'var(--font-sans)',
+      }}>Rechazar</button>
+    </div>
+  );
+}
+
+function VerificationQueue({ operators, lots, onReviewed }) {
+  var [tab, setTab]   = React.useState('operadores');
+  var [busy, setBusy] = React.useState(null);
+  function act(kind, id, action) {
+    var reason = null;
+    if (action === 'reject') {
+      reason = window.prompt('Motivo del rechazo (se mostrará al operador):', '');
+      if (reason === null) return;
+    }
+    setBusy(id + action);
+    var p = kind === 'op' ? reviewOperator(id, action, reason) : reviewLot(id, action, reason);
+    p.then(function() { setBusy(null); onReviewed(); }).catch(function() { setBusy(null); onReviewed(); });
+  }
+  return (
+    <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 12, overflow: 'hidden' }}>
+      <div style={{ padding: '10px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Verificaciones pendientes</h3>
+        <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
+          <AdmChip active={tab === 'operadores'} onClick={function() { setTab('operadores'); }}>Operadores ({operators.length})</AdmChip>
+          <AdmChip active={tab === 'parqueos'} onClick={function() { setTab('parqueos'); }}>Parqueos ({lots.length})</AdmChip>
+        </div>
+      </div>
+      <div style={{ maxHeight: 420, overflowY: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {tab === 'operadores' && operators.length === 0 && (
+          <div style={{ padding: 24, textAlign: 'center', color: '#bbb', fontSize: 12 }}>No hay operadores esperando revisión.</div>
+        )}
+        {tab === 'operadores' && operators.map(function(op) {
+          return (
+            <div key={op.id} style={{ border: '1px solid #eee', borderRadius: 10, padding: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: '#111' }}>{op.name}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#888', marginTop: 2 }}>{op.email}</div>
+                  <div style={{ fontSize: 12, color: '#555', marginTop: 4 }}>
+                    📞 {op.phone || '—'}{op.business ? '  ·  🏢 ' + op.business : ''}
+                  </div>
+                </div>
+                <AdmReviewBtns busyKey={busy === op.id + 'approve' || busy === op.id + 'reject' ? busy : null}
+                  onApprove={function() { act('op', op.id, 'approve'); }} onReject={function() { act('op', op.id, 'reject'); }} />
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+                <AdmPhoto id={op.docs.idFront} label="CI anverso" />
+                <AdmPhoto id={op.docs.idBack} label="CI reverso" />
+                <AdmPhoto id={op.docs.selfie} label="Selfie + CI" />
+                <AdmPhoto id={op.docs.business} label="Negocio/NIT" />
+              </div>
+            </div>
+          );
+        })}
+
+        {tab === 'parqueos' && lots.length === 0 && (
+          <div style={{ padding: 24, textAlign: 'center', color: '#bbb', fontSize: 12 }}>No hay parqueos esperando revisión.</div>
+        )}
+        {tab === 'parqueos' && lots.map(function(lt) {
+          return (
+            <div key={lt.lotId} style={{ border: '1px solid #eee', borderRadius: 10, padding: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: '#111' }}>{lt.name}</div>
+                  <div style={{ fontSize: 12, color: '#555', marginTop: 3 }}>📍 {lt.address || '—'}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#888', marginTop: 3 }}>
+                    {lt.ownerName} · {lt.ownerPhone || lt.ownerEmail}{typeof lt.total === 'number' ? '  ·  ' + lt.total + ' esp.' : ''}
+                  </div>
+                </div>
+                <AdmReviewBtns busyKey={busy === lt.lotId + 'approve' || busy === lt.lotId + 'reject' ? busy : null}
+                  onApprove={function() { act('lot', lt.lotId, 'approve'); }} onReject={function() { act('lot', lt.lotId, 'reject'); }} />
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+                {(lt.photoIds || []).map(function(pid) { return <AdmPhoto key={pid} id={pid} />; })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function AdminApp({ store, session, onSignOut }) {
   var lots     = store.lots;
   var events   = _useEvents();
   var accounts = useAccounts();
+  var verifs   = useVerifications();
 
   var [roleFilter, setRoleFilter] = React.useState('todos');
   var [period, setPeriod]         = React.useState('todos');
@@ -163,6 +305,7 @@ function AdminApp({ store, session, onSignOut }) {
 
   var drivers = accounts.filter(function(a) { return a.role === 'conductor'; });
   var owners  = accounts.filter(function(a) { return a.role === 'operador'; });
+  var approvedLots = lots.filter(function(l) { return l.status === 'approved'; });
 
   function userStats(u) {
     var mine = events.filter(function(ev) { return ev.userId === u.id; });
@@ -213,13 +356,18 @@ function AdminApp({ store, session, onSignOut }) {
 
       <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 14, minHeight: 0 }}>
         {/* Stats */}
-        <div style={{ display: 'flex', gap: 12 }}>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <AdmStat label="Cuentas" value={accounts.length} sub={drivers.length + ' conductores · ' + owners.length + ' operadores'} />
-          <AdmStat label="Parqueos publicados" value={lots.length} sub={lots.filter(function(l) { return l.occupied >= l.total; }).length + ' llenos ahora'} />
-          <AdmStat label={'Usos efectivos (' + (period === 'todos' ? 'total' : period) + ')'} value={effectiveInPeriod.length} accent
+          <AdmStat label="Parqueos publicados" value={approvedLots.length} sub={approvedLots.filter(function(l) { return l.occupied >= l.total; }).length + ' llenos ahora'} />
+          <AdmStat label="Verificaciones pendientes" value={verifs.operators.length + verifs.lots.length} accent
+            sub={verifs.operators.length + ' operadores · ' + verifs.lots.length + ' parqueos'} />
+          <AdmStat label={'Usos efectivos (' + (period === 'todos' ? 'total' : period) + ')'} value={effectiveInPeriod.length}
             sub={effectiveInPeriod.filter(function(e){return e.role==='conductor';}).length + ' de conductores · ' + effectiveInPeriod.filter(function(e){return e.role==='operador';}).length + ' de operadores'} />
           <AdmStat label="Eventos registrados" value={events.length} sub="máx. 5000 · los más antiguos rotan" />
         </div>
+
+        {/* Verification review queue */}
+        <VerificationQueue operators={verifs.operators} lots={verifs.lots} onReviewed={verifs.refresh} />
 
         {/* Users table */}
         <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 12, overflow: 'hidden' }}>

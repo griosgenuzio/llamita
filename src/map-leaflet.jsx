@@ -40,7 +40,9 @@ function LeafletParkingMap({ lots, selectedId, onSelect, filterFn, pulseLotId })
     var sel = selectedRef.current;
 
     lotsRef.current.forEach(function(lot) {
-      if (!lot.lat || !lot.lng) return;
+      // Only admin-approved lots are drawn for drivers. (This hard skip actually
+      // hides the marker; filterFn below merely fades, so the gate must be here.)
+      if (!lot.lat || !lot.lng || lot.status !== 'approved') return;
 
       var full       = lot.occupied >= lot.total;
       var isSelected = lot.id === sel;

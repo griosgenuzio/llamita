@@ -206,8 +206,10 @@ function DriverApp({ store, session, onSignOut }) {
     return true;
   }, [filters]);
 
-  const selected  = lots.find(l => l.id === selectedId);
-  const visible   = lots.filter(filterFn);
+  // Drivers only ever see admin-approved lots (same gate as the map markers).
+  const approved  = lots.filter(l => l.status === 'approved');
+  const selected  = approved.find(l => l.id === selectedId);
+  const visible   = approved.filter(filterFn);
   const totalAvail = visible.reduce((s, l) => s + Math.max(0, l.total - l.occupied), 0);
 
   return (
@@ -349,7 +351,7 @@ function DriverApp({ store, session, onSignOut }) {
               La Paz
             </div>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#111', letterSpacing: '-0.01em' }}>
-              {lots.length === 0 ? (
+              {approved.length === 0 ? (
                 'Aún no hay parqueos publicados'
               ) : (
                 <React.Fragment>
@@ -359,7 +361,7 @@ function DriverApp({ store, session, onSignOut }) {
                 </React.Fragment>
               )}
             </div>
-            {lots.length === 0 && (
+            {approved.length === 0 && (
               <div style={{ fontSize: 11, color: '#aaa', marginTop: 3 }}>
                 Los parqueos aparecerán aquí cuando los operadores los registren.
               </div>

@@ -42,6 +42,19 @@ Usa el puerto 443, así que funciona en hosts que bloquean SMTP saliente (como R
 
 Sin ninguna de las dos opciones el servidor funciona en **modo desarrollo**: imprime el código en la consola del servidor en vez de enviarlo por correo (la pantalla de verificación lo avisa).
 
+## Verificación de operadores y parqueos
+
+Para evitar parqueos falsos, hay dos controles con revisión manual del administrador (estilo Airbnb):
+
+1. **Identidad del operador** — antes de poder publicar cualquier parqueo, el operador sube: carnet de identidad (anverso y reverso), una selfie sosteniendo su CI, un documento del negocio (NIT / razón social) y un teléfono de contacto. El administrador aprueba o rechaza desde su panel. Hasta ser aprobado, el operador no puede crear parqueos.
+2. **Cada parqueo** — al crear un parqueo, el operador sube al menos 3 fotos reales del espacio y una dirección. El parqueo **no aparece en el mapa de los conductores** hasta que el administrador lo apruebe.
+
+Las imágenes se guardan en disco (junto a la base de datos, p. ej. el volumen de Railway en `/data/uploads`), no dentro del estado compartido, y se sirven solo con autenticación (los documentos de identidad son privados: solo el operador dueño y el administrador los ven). El estado de aprobación de cada parqueo es **autoritativo del servidor** — el cliente no puede falsificarlo.
+
+### Borrar todos los datos (empezar de cero)
+
+Define `LLAMITA_RESET_DATA` con un valor único (p. ej. `reset-2026-07-22`). En el siguiente arranque el servidor borra todas las cuentas, parqueos, eventos y archivos subidos, y empieza de cero. Es **idempotente por valor**: se ejecuta una sola vez por token, así que dejar la variable puesta no vuelve a borrar datos futuros. Para volver a borrar, cambia el valor.
+
 ## Ejecutar sin servidor (modo demo)
 
 Abre `index.html` desde cualquier hosting estático (por ejemplo GitHub Pages). La app funciona igual, pero cada navegador guarda sus propios datos en `localStorage` — no hay mapa compartido ni cuentas permanentes. Para conectar un frontend estático a un backend desplegado, define `window.LLAMITA_API_BASE` en `index.html`.
