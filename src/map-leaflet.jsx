@@ -57,26 +57,20 @@ function LeafletParkingMap({ lots, selectedId, onSelect, filterFn, pulseLotId })
       var visible    = fn ? fn(lot) : true;
       // Colour by availability: green (5+), orange (1–4), red/LLENO (0).
       var tone       = full ? FULL : (free < 5 ? LOW : AVAIL);
-      var radius     = isSelected ? 14 : 10;
-      var opacity    = visible ? 0.92 : 0.20;
 
-      // Coloured pill beside the marker: the free-space count, or LLENO.
+      // ONE mark per lot: a single coloured pill centred on the location, with
+      // the free-space count (or LLENO). The circle marker underneath is
+      // invisible — it only provides the click/anchor target, so there is no
+      // separate location dot next to the pill.
       var label =
-        '<span style="background:' + tone + ';color:#fff;padding:2px 8px;border-radius:999px;' +
-        'display:inline-block;box-shadow:0 1px 4px rgba(0,0,0,.28)">' + (full ? 'LLENO' : free) + '</span>';
+        '<span style="background:' + tone + ';color:#fff;padding:3px 9px;border-radius:999px;' +
+        'display:inline-block;font-weight:700;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.35)' +
+        (isSelected ? ';outline:2px solid ' + tone + ';outline-offset:1px' : '') +
+        '">' + (full ? 'LLENO' : free) + '</span>';
 
-      var style = {
-        radius:      radius,
-        fillColor:   tone,
-        color:       '#ffffff',
-        weight:      isSelected ? 4 : 3,
-        opacity:     1,
-        fillOpacity: opacity,
-      };
+      var style = { radius: 18, opacity: 0, fillOpacity: 0 };
 
       if (markersRef.current[lot.id]) {
-        markersRef.current[lot.id].setStyle(style);
-        markersRef.current[lot.id].setRadius(radius);
         markersRef.current[lot.id].setTooltipContent(label);
       } else {
         var m = L.circleMarker([lot.lat, lot.lng], style);
@@ -85,8 +79,8 @@ function LeafletParkingMap({ lots, selectedId, onSelect, filterFn, pulseLotId })
         }(lot));
         m.bindTooltip(label, {
           permanent:  true,
-          direction:  'right',
-          offset:     [10, 0],
+          direction:  'center',
+          offset:     [0, 0],
           className:  'llamita-lbl',
         });
         m.addTo(map);
@@ -163,18 +157,13 @@ function LeafletParkingMap({ lots, selectedId, onSelect, filterFn, pulseLotId })
     if (!pulseLotId || !readyRef.current) return;
     var m = markersRef.current[pulseLotId];
     if (!m) return;
-    var lot = lotsRef.current.find(function(l) { return l.id === pulseLotId; });
-    if (!lot) return;
-    var full = lot.occupied >= lot.total;
-    var origR = selectedRef.current === pulseLotId ? 14 : 10;
-    m.setRadius(origR + 10);
-    m.setStyle({ weight: 6 });
-    var t = setTimeout(function() {
-      if (markersRef.current[pulseLotId]) {
-        markersRef.current[pulseLotId].setRadius(origR);
-        markersRef.current[pulseLotId].setStyle({ weight: selectedRef.current === pulseLotId ? 4 : 3 });
-      }
-    }, 600);
+    var tt = m.getTooltip && m.getTooltip();
+    var el = tt && tt.getElement && tt.getElement();
+    var span = el && el.querySelector ? el.querySelector('span') : null;
+    if (!span) return;
+    span.style.transition = 'transform 0.18s ease';
+    span.style.transform = 'scale(1.4)';
+    var t = setTimeout(function() { if (span) span.style.transform = 'scale(1)'; }, 300);
     return function() { clearTimeout(t); };
   }, [pulseLotId]);
 
