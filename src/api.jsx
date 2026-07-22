@@ -90,6 +90,9 @@
       verification_already_submitted: 'Ya enviaste tu verificación; está en revisión.',
       operator_unverified: 'Tu cuenta de operador aún no está verificada.',
       invalid_lot_submission: 'Sube al menos 3 fotos y una dirección para publicar el parqueo.',
+      lot_not_approved: 'Solo puedes editar parqueos ya aprobados.',
+      no_changes: 'No hiciste ningún cambio para enviar.',
+      invalid_edit: 'Revisa los datos: el nombre, la dirección y la capacidad son obligatorios.',
     };
     return map[e && e.message] || 'No se pudo conectar con el servidor. Intenta de nuevo.';
   }

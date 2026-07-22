@@ -208,6 +208,19 @@ function useLlamitaStore() {
     return id;
   };
 
+  // Operators delete their own lots. Server-backed: call the API (which also
+  // cleans up photos), then drop it locally; offline: just drop it locally.
+  const deleteLot = (id) => {
+    setLots(prev => prev.filter(l => l.id !== id));
+    track('lot_deleted', { lotId: id });
+    try {
+      if (window.LlamitaApi.isAvailable() && window.LlamitaApi.token()) {
+        return window.LlamitaApi.req('DELETE', '/api/operator/lot/' + encodeURIComponent(id)).catch(() => {});
+      }
+    } catch (e) {}
+    return Promise.resolve();
+  };
+
   const checkIn = (s) => {
     const id = uid('s');
     setSessions(prev => [...prev, { id, ...s, status: 'active' }]);
@@ -240,7 +253,7 @@ function useLlamitaStore() {
 
   return {
     lots, sessions, history, pulseLotId,
-    updateLot, setOccupied, toggleFull, addLot, checkIn, checkOut,
+    updateLot, setOccupied, toggleFull, addLot, deleteLot, checkIn, checkOut,
   };
 }
 

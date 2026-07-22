@@ -70,6 +70,11 @@ const UPLOAD_DIR = process.env.LLAMITA_UPLOADS || path.join(path.dirname(DB_PATH
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;             // per photo
 const UPLOAD_PURPOSES = ['id_front', 'id_back', 'selfie', 'business', 'lot_photo'];
 const MIN_LOT_PHOTOS = 3;
+// Listing-identity fields — an operator may only change these on an existing
+// lot through the admin-reviewed edit flow, never by pushing state directly.
+const GATED_LOT_FIELDS = ['name', 'address', 'lat', 'lng', 'total', 'terrain', 'covered', 'keyRequired', 'security', 'hours'];
+// Operational fields an operator may change live (no review): occupancy + price.
+const OPERATIONAL_LOT_FIELDS = ['occupied', 'fees', 'payment'];
 // One-time data wipe: set LLAMITA_RESET_DATA to a unique token to erase all
 // users/lots/events on next boot. Idempotent per token value (runs once).
 const RESET_TOKEN = process.env.LLAMITA_RESET_DATA || '';
@@ -146,6 +151,21 @@ db.exec(`
     reviewed_by  TEXT,
     reject_reason TEXT
   );
+  -- Proposed edits to an approved lot's listing details. The live lot keeps its
+  -- current details until an admin approves the edit (then changes are applied).
+  CREATE TABLE IF NOT EXISTS lot_edits (
+    id            TEXT PRIMARY KEY,
+    lot_id        TEXT NOT NULL,
+    owner_id      TEXT NOT NULL,
+    changes       TEXT NOT NULL,          -- JSON of proposed gated-field values
+    photo_ids     TEXT NOT NULL DEFAULT '[]',
+    status        TEXT NOT NULL,          -- pending | approved | rejected
+    submitted_at  TEXT NOT NULL,
+    reviewed_at   TEXT,
+    reviewed_by   TEXT,
+    reject_reason TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_lot_edits_status ON lot_edits (status);
   CREATE TABLE IF NOT EXISTS system_meta (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -185,6 +205,7 @@ db.prepare(`INSERT OR IGNORE INTO app_state (id, version, data)
     DELETE FROM events;
     DELETE FROM uploads;
     DELETE FROM lot_verifications;
+    DELETE FROM lot_edits;
     UPDATE app_state SET version = 0, data = '{"lots":[],"sessions":[],"history":[]}' WHERE id = 1;
   `);
   try {
@@ -711,6 +732,132 @@ async function handleApi(req, res, pathname) {
     }
   }
 
+  // Operator deletes one of their own lots (no admin review needed).
+  {
+    const m = /^\/api\/operator\/lot\/([^/]+)$/.exec(pathname);
+    if (m && method === 'DELETE') {
+      const who = authFrom(req);
+      if (!who || (who.role !== 'operador' && who.role !== 'admin')) return json(res, 403, { error: 'forbidden' });
+      const lotId = m[1];
+      const lv = db.prepare('SELECT * FROM lot_verifications WHERE lot_id = ?').get(lotId);
+      if (who.role === 'operador' && (!lv || lv.owner_id !== who.id)) return json(res, 403, { error: 'forbidden' });
+      // Remove from the shared blob.
+      const stateRow = db.prepare('SELECT version, data FROM app_state WHERE id = 1').get();
+      const state = JSON.parse(stateRow.data);
+      const before = state.lots.length;
+      state.lots = state.lots.filter(l => l.id !== lotId);
+      if (state.lots.length !== before) {
+        db.prepare('UPDATE app_state SET version = ?, data = ? WHERE id = 1').run(stateRow.version + 1, JSON.stringify(state));
+      }
+      // Clean up verification, any edits, and the uploaded photo files.
+      const photoIds = lv ? JSON.parse(lv.photo_ids || '[]') : [];
+      for (const e of db.prepare('SELECT photo_ids FROM lot_edits WHERE lot_id = ?').all(lotId)) {
+        try { for (const pid of JSON.parse(e.photo_ids || '[]')) photoIds.push(pid); } catch (x) {}
+      }
+      db.prepare('DELETE FROM lot_verifications WHERE lot_id = ?').run(lotId);
+      db.prepare('DELETE FROM lot_edits WHERE lot_id = ?').run(lotId);
+      for (const pid of photoIds) {
+        const up = db.prepare('SELECT ext FROM uploads WHERE id = ?').get(pid);
+        if (up) { try { fs.unlinkSync(path.join(UPLOAD_DIR, `${pid}.${up.ext}`)); } catch (x) {} db.prepare('DELETE FROM uploads WHERE id = ?').run(pid); }
+      }
+      return json(res, 200, { ok: true });
+    }
+  }
+
+  // Operator submits an edit request (listing details) with new proof photos.
+  {
+    const m = /^\/api\/operator\/lot\/([^/]+)\/edit$/.exec(pathname);
+    if (m && method === 'POST') {
+      const who = authFrom(req);
+      if (!who || who.role !== 'operador') return json(res, 403, { error: 'forbidden' });
+      const lotId = m[1];
+      const lv = db.prepare('SELECT * FROM lot_verifications WHERE lot_id = ?').get(lotId);
+      if (!lv || lv.owner_id !== who.id) return json(res, 403, { error: 'forbidden' });
+      if (lv.status !== 'approved') return json(res, 409, { error: 'lot_not_approved' });
+      const bd = await readBody(req);
+      const photoIds = Array.isArray(bd.photoIds) ? bd.photoIds : [];
+      const validPhotos = photoIds.filter(pid => {
+        const up = db.prepare('SELECT owner_id, purpose FROM uploads WHERE id = ?').get(String(pid));
+        return up && up.owner_id === who.id && up.purpose === 'lot_photo';
+      });
+      if (validPhotos.length < MIN_LOT_PHOTOS) return json(res, 400, { error: 'invalid_lot_submission' });
+      const src = bd.changes || {};
+      const changes = {};
+      for (const f of GATED_LOT_FIELDS) if (src[f] !== undefined) changes[f] = src[f];
+      if ((changes.name !== undefined && !String(changes.name).trim()) ||
+          (changes.address !== undefined && !String(changes.address).trim()) ||
+          (changes.total !== undefined && !(Number(changes.total) >= 1))) {
+        return json(res, 400, { error: 'invalid_edit' });
+      }
+      if (!Object.keys(changes).length) return json(res, 400, { error: 'no_changes' });
+      db.prepare("DELETE FROM lot_edits WHERE lot_id = ? AND status = 'pending'").run(lotId);
+      const editId = uid('ed');
+      db.prepare(`INSERT INTO lot_edits (id,lot_id,owner_id,changes,photo_ids,status,submitted_at)
+                  VALUES (?,?,?,?,?,'pending',?)`)
+        .run(editId, lotId, who.id, JSON.stringify(changes), JSON.stringify(validPhotos), nowIso());
+      return json(res, 200, { ok: true, editId });
+    }
+  }
+
+  // Operator's own pending / rejected edits, keyed by lot (for status badges).
+  if (pathname === '/api/operator/edits' && method === 'GET') {
+    const who = authFrom(req);
+    if (!who || who.role !== 'operador') return json(res, 403, { error: 'forbidden' });
+    const rows = db.prepare("SELECT lot_id, status, reject_reason FROM lot_edits WHERE owner_id = ? AND status IN ('pending','rejected') ORDER BY submitted_at DESC").all(who.id);
+    const byLot = {};
+    for (const r of rows) if (!byLot[r.lot_id]) byLot[r.lot_id] = { status: r.status, rejectReason: r.reject_reason };
+    return json(res, 200, { edits: byLot });
+  }
+
+  // Admin: pending edit requests, with a current-vs-proposed diff + proof photos.
+  if (pathname === '/api/admin/edits/pending' && method === 'GET') {
+    const who = authFrom(req);
+    if (!who || who.role !== 'admin') return json(res, 403, { error: 'forbidden' });
+    const rows = db.prepare("SELECT * FROM lot_edits WHERE status = 'pending' ORDER BY submitted_at ASC").all();
+    const state = JSON.parse(db.prepare('SELECT data FROM app_state WHERE id = 1').get().data);
+    const lotById = {}; for (const l of state.lots) lotById[l.id] = l;
+    return json(res, 200, { edits: rows.map(r => {
+      const lot = lotById[r.lot_id] || {};
+      const owner = db.prepare('SELECT name, phone FROM users WHERE id = ?').get(r.owner_id) || {};
+      const changes = JSON.parse(r.changes || '{}');
+      const current = {}; for (const k of Object.keys(changes)) current[k] = lot[k];
+      return {
+        editId: r.id, lotId: r.lot_id, lotName: lot.name || '(sin nombre)',
+        ownerName: owner.name || '', ownerPhone: owner.phone || '',
+        changes, current, photoIds: JSON.parse(r.photo_ids || '[]'), submittedAt: r.submitted_at,
+      };
+    }) });
+  }
+
+  {
+    const m = /^\/api\/admin\/edit\/([^/]+)\/(approve|reject)$/.exec(pathname);
+    if (m && method === 'POST') {
+      const who = authFrom(req);
+      if (!who || who.role !== 'admin') return json(res, 403, { error: 'forbidden' });
+      const [, editId, action] = m;
+      const bd = await readBody(req);
+      const ed = db.prepare('SELECT * FROM lot_edits WHERE id = ?').get(editId);
+      if (!ed) return json(res, 404, { error: 'not_found' });
+      if (action === 'reject') {
+        db.prepare("UPDATE lot_edits SET status='rejected', reviewed_at=?, reviewed_by=?, reject_reason=? WHERE id=?")
+          .run(nowIso(), who.id, String(bd.reason || 'Sin especificar'), editId);
+        return json(res, 200, { ok: true, status: 'rejected' });
+      }
+      // Approve: apply the proposed changes to the live lot in the blob.
+      const changes = JSON.parse(ed.changes || '{}');
+      const stateRow = db.prepare('SELECT version, data FROM app_state WHERE id = 1').get();
+      const state = JSON.parse(stateRow.data);
+      let found = false;
+      state.lots = state.lots.map(l => (l.id === ed.lot_id ? (found = true, Object.assign({}, l, changes)) : l));
+      if (found) db.prepare('UPDATE app_state SET version = ?, data = ? WHERE id = 1').run(stateRow.version + 1, JSON.stringify(state));
+      db.prepare("UPDATE lot_edits SET status='approved', reviewed_at=?, reviewed_by=? WHERE id=?").run(nowIso(), who.id, editId);
+      // Keep the verification record's address/photos in step with the approved edit.
+      if (changes.address !== undefined) db.prepare('UPDATE lot_verifications SET address=? WHERE lot_id=?').run(String(changes.address), ed.lot_id);
+      db.prepare('UPDATE lot_verifications SET photo_ids=? WHERE lot_id=?').run(ed.photo_ids, ed.lot_id);
+      return json(res, 200, { ok: true, status: 'approved' });
+    }
+  }
+
   if (pathname === '/api/state' && method === 'GET') {
     const row = db.prepare('SELECT version, data FROM app_state WHERE id = 1').get();
     return json(res, 200, { version: row.version, state: JSON.parse(row.data) });
@@ -726,45 +873,63 @@ async function handleApi(req, res, pathname) {
     if (!s || !Array.isArray(s.lots) || !Array.isArray(s.sessions) || !Array.isArray(s.history)) {
       return json(res, 400, { error: 'invalid_state' });
     }
-    // Whether this operator may create new lots at all.
-    let opApproved = who.role === 'admin';
-    if (who.role === 'operador') {
-      const u = db.prepare('SELECT verif_status FROM users WHERE id = ?').get(who.id);
-      opApproved = !!u && u.verif_status === 'approved';
-    }
-    // Reconcile each lot against the authoritative lot_verifications table:
-    // a client-supplied `status` is never trusted — it's re-derived here. A lot
-    // id we've never seen is a new submission and must pass the gate.
-    const lots = [];
-    for (const lot of s.lots) {
-      if (!lot || typeof lot.id !== 'string') continue;
-      let lv = db.prepare('SELECT status FROM lot_verifications WHERE lot_id = ?').get(lot.id);
-      if (!lv) {
-        if (who.role === 'operador') {
-          if (!opApproved) return json(res, 403, { error: 'operator_unverified' });
-          const photoIds = Array.isArray(lot.photoIds) ? lot.photoIds : [];
-          const address = String(lot.address || '').trim();
-          const validPhotos = photoIds.filter(pid => {
-            const up = db.prepare('SELECT owner_id, purpose FROM uploads WHERE id = ?').get(String(pid));
-            return up && up.owner_id === who.id && up.purpose === 'lot_photo';
-          });
-          if (validPhotos.length < MIN_LOT_PHOTOS || !address) {
-            return json(res, 400, { error: 'invalid_lot_submission' });
-          }
-          db.prepare(`INSERT INTO lot_verifications (lot_id,owner_id,status,address,photo_ids,submitted_at)
-                      VALUES (?,?,?,?,?,?)`)
-            .run(lot.id, who.id, 'pending', address, JSON.stringify(validPhotos), nowIso());
-          lv = { status: 'pending' };
-        } else {
-          // Admin-created lots are trusted (auto-approved).
+    const statusOf = (id) => { const lv = db.prepare('SELECT status FROM lot_verifications WHERE lot_id = ?').get(id); return lv ? lv.status : null; };
+    const ownerOf = (id) => { const lv = db.prepare('SELECT owner_id FROM lot_verifications WHERE lot_id = ?').get(id); return lv ? lv.owner_id : null; };
+    const clientById = {}; for (const l of s.lots) if (l && typeof l.id === 'string') clientById[l.id] = l;
+
+    let lots;
+    if (who.role === 'admin') {
+      // Admin is trusted to add/edit/delete anything; still stamp authoritative status.
+      lots = [];
+      for (const lot of s.lots) {
+        if (!lot || typeof lot.id !== 'string') continue;
+        let st = statusOf(lot.id);
+        if (!st) {
           db.prepare(`INSERT INTO lot_verifications (lot_id,owner_id,status,address,photo_ids,submitted_at,reviewed_at,reviewed_by)
                       VALUES (?,?,?,?,?,?,?,?)`)
             .run(lot.id, lot.ownerId || 'admin', 'approved', String(lot.address || ''),
                  JSON.stringify(Array.isArray(lot.photoIds) ? lot.photoIds : []), nowIso(), nowIso(), 'admin');
-          lv = { status: 'approved' };
+          st = 'approved';
         }
+        lots.push(Object.assign({}, lot, { status: st }));
       }
-      lots.push(Object.assign({}, lot, { status: lv.status }));
+    } else {
+      // Operator: server-authoritative for listing fields. Start from the CURRENT
+      // server lots (so nothing is deleted via a state push and other operators'
+      // lots can't be touched), apply only operational-field changes to their own
+      // lots, then run the creation gate for genuinely new lots.
+      const opApproved = (() => {
+        const u = db.prepare('SELECT verif_status FROM users WHERE id = ?').get(who.id);
+        return !!u && u.verif_status === 'approved';
+      })();
+      const stateRow0 = db.prepare('SELECT data FROM app_state WHERE id = 1').get();
+      const serverLots = JSON.parse(stateRow0.data).lots;
+      const outById = {};
+      for (const sl of serverLots) {
+        const merged = Object.assign({}, sl, { status: statusOf(sl.id) || sl.status });
+        if (ownerOf(sl.id) === who.id && clientById[sl.id]) {
+          const cl = clientById[sl.id];
+          for (const f of OPERATIONAL_LOT_FIELDS) if (cl[f] !== undefined) merged[f] = cl[f];
+        }
+        outById[sl.id] = merged;
+      }
+      // New lots (not present on the server) → creation gate.
+      for (const lot of s.lots) {
+        if (!lot || typeof lot.id !== 'string' || outById[lot.id]) continue;
+        if (!opApproved) return json(res, 403, { error: 'operator_unverified' });
+        const photoIds = Array.isArray(lot.photoIds) ? lot.photoIds : [];
+        const address = String(lot.address || '').trim();
+        const validPhotos = photoIds.filter(pid => {
+          const up = db.prepare('SELECT owner_id, purpose FROM uploads WHERE id = ?').get(String(pid));
+          return up && up.owner_id === who.id && up.purpose === 'lot_photo';
+        });
+        if (validPhotos.length < MIN_LOT_PHOTOS || !address) return json(res, 400, { error: 'invalid_lot_submission' });
+        db.prepare(`INSERT INTO lot_verifications (lot_id,owner_id,status,address,photo_ids,submitted_at)
+                    VALUES (?,?,?,?,?,?)`)
+          .run(lot.id, who.id, 'pending', address, JSON.stringify(validPhotos), nowIso());
+        outById[lot.id] = Object.assign({}, lot, { status: 'pending' });
+      }
+      lots = Object.values(outById);
     }
     const row = db.prepare('SELECT version FROM app_state WHERE id = 1').get();
     const version = row.version + 1;

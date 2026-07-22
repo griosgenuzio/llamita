@@ -141,16 +141,17 @@ function RolePill({ role }) {
   );
 }
 
-// Pending verification queues (operators + lots), polled from the server.
+// Pending verification queues (operators + lots + edits), polled from the server.
 function useVerifications() {
-  var [data, setData] = React.useState({ operators: [], lots: [] });
+  var [data, setData] = React.useState({ operators: [], lots: [], edits: [] });
   var pull = React.useCallback(function() {
     if (!window.LlamitaApi || !window.LlamitaApi.isAvailable()) return;
     Promise.all([
       window.LlamitaApi.req('GET', '/api/admin/operators/pending').catch(function() { return { operators: [] }; }),
       window.LlamitaApi.req('GET', '/api/admin/lots/pending').catch(function() { return { lots: [] }; }),
+      window.LlamitaApi.req('GET', '/api/admin/edits/pending').catch(function() { return { edits: [] }; }),
     ]).then(function(res) {
-      setData({ operators: res[0].operators || [], lots: res[1].lots || [] });
+      setData({ operators: res[0].operators || [], lots: res[1].lots || [], edits: res[2].edits || [] });
     });
   }, []);
   React.useEffect(function() {
@@ -158,7 +159,7 @@ function useVerifications() {
     try { window.LlamitaApi.ready.then(function(ok) { if (!ok || stopped) return; pull(); timer = setInterval(pull, 10000); }); } catch (e) {}
     return function() { stopped = true; clearInterval(timer); };
   }, [pull]);
-  return { operators: data.operators, lots: data.lots, refresh: pull };
+  return { operators: data.operators, lots: data.lots, edits: data.edits, refresh: pull };
 }
 
 function reviewOperator(id, action, reason) {
@@ -166,6 +167,23 @@ function reviewOperator(id, action, reason) {
 }
 function reviewLot(id, action, reason) {
   return window.LlamitaApi.req('POST', '/api/admin/lot/' + encodeURIComponent(id) + '/' + action, reason ? { reason: reason } : {});
+}
+function reviewEdit(id, action, reason) {
+  return window.LlamitaApi.req('POST', '/api/admin/edit/' + encodeURIComponent(id) + '/' + action, reason ? { reason: reason } : {});
+}
+
+// Human-readable labels + formatting for edited listing fields.
+var EDIT_FIELD_LABELS = {
+  name: 'Nombre', address: 'Dirección', total: 'Capacidad', terrain: 'Terreno',
+  covered: 'Cubierto', keyRequired: 'Entrega de llave', security: 'Seguridad', hours: 'Horario',
+  lat: 'Latitud', lng: 'Longitud',
+};
+function fmtEditVal(v) {
+  if (v === true) return 'Sí';
+  if (v === false) return 'No';
+  if (Array.isArray(v)) return v.length ? v.join(', ') : '—';
+  if (v === null || v === undefined || v === '') return '—';
+  return String(v);
 }
 
 // A private upload rendered as a thumbnail (fetched with the admin's auth
@@ -204,9 +222,10 @@ function AdmReviewBtns({ busyKey, onApprove, onReject }) {
   );
 }
 
-function VerificationQueue({ operators, lots, onReviewed }) {
+function VerificationQueue({ operators, lots, edits, onReviewed }) {
   var [tab, setTab]   = React.useState('operadores');
   var [busy, setBusy] = React.useState(null);
+  edits = edits || [];
   function act(kind, id, action) {
     var reason = null;
     if (action === 'reject') {
@@ -214,16 +233,17 @@ function VerificationQueue({ operators, lots, onReviewed }) {
       if (reason === null) return;
     }
     setBusy(id + action);
-    var p = kind === 'op' ? reviewOperator(id, action, reason) : reviewLot(id, action, reason);
+    var p = kind === 'op' ? reviewOperator(id, action, reason) : kind === 'edit' ? reviewEdit(id, action, reason) : reviewLot(id, action, reason);
     p.then(function() { setBusy(null); onReviewed(); }).catch(function() { setBusy(null); onReviewed(); });
   }
   return (
     <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 12, overflow: 'hidden', flexShrink: 0 }}>
-      <div style={{ padding: '10px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ padding: '10px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Verificaciones pendientes</h3>
         <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
           <AdmChip active={tab === 'operadores'} onClick={function() { setTab('operadores'); }}>Operadores ({operators.length})</AdmChip>
           <AdmChip active={tab === 'parqueos'} onClick={function() { setTab('parqueos'); }}>Parqueos ({lots.length})</AdmChip>
+          <AdmChip active={tab === 'ediciones'} onClick={function() { setTab('ediciones'); }}>Ediciones ({edits.length})</AdmChip>
         </div>
       </div>
       <div style={{ maxHeight: 420, overflowY: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -273,6 +293,43 @@ function VerificationQueue({ operators, lots, onReviewed }) {
               </div>
               <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
                 {(lt.photoIds || []).map(function(pid) { return <AdmPhoto key={pid} id={pid} />; })}
+              </div>
+            </div>
+          );
+        })}
+
+        {tab === 'ediciones' && edits.length === 0 && (
+          <div style={{ padding: 24, textAlign: 'center', color: '#bbb', fontSize: 12 }}>No hay ediciones esperando revisión.</div>
+        )}
+        {tab === 'ediciones' && edits.map(function(ed) {
+          var keys = Object.keys(ed.changes || {});
+          return (
+            <div key={ed.editId} style={{ border: '1px solid #eee', borderRadius: 10, padding: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: '#111' }}>{ed.lotName}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#888', marginTop: 3 }}>
+                    {ed.ownerName}{ed.ownerPhone ? ' · ' + ed.ownerPhone : ''} · edición propuesta
+                  </div>
+                </div>
+                <AdmReviewBtns busyKey={busy === ed.editId + 'approve' || busy === ed.editId + 'reject' ? busy : null}
+                  onApprove={function() { act('edit', ed.editId, 'approve'); }} onReject={function() { act('edit', ed.editId, 'reject'); }} />
+              </div>
+              <div style={{ marginTop: 10, border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden' }}>
+                {keys.map(function(k, i) {
+                  return (
+                    <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', fontSize: 12, borderTop: i ? '1px solid #f5f5f5' : 'none' }}>
+                      <span style={{ width: 90, flexShrink: 0, color: '#999', fontSize: 11 }}>{EDIT_FIELD_LABELS[k] || k}</span>
+                      <span style={{ color: '#999', textDecoration: 'line-through', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fmtEditVal(ed.current ? ed.current[k] : undefined)}</span>
+                      <span style={{ color: '#aaa' }}>→</span>
+                      <span style={{ color: '#111', fontWeight: 600, flex: 1, minWidth: 0 }}>{fmtEditVal(ed.changes[k])}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ fontSize: 10, color: '#aaa', margin: '10px 0 6px' }}>Fotos de respaldo</div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                {(ed.photoIds || []).map(function(pid) { return <AdmPhoto key={pid} id={pid} />; })}
               </div>
             </div>
           );
@@ -359,15 +416,15 @@ function AdminApp({ store, session, onSignOut }) {
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <AdmStat label="Cuentas" value={accounts.length} sub={drivers.length + ' conductores · ' + owners.length + ' operadores'} />
           <AdmStat label="Parqueos publicados" value={approvedLots.length} sub={approvedLots.filter(function(l) { return l.occupied >= l.total; }).length + ' llenos ahora'} />
-          <AdmStat label="Verificaciones pendientes" value={verifs.operators.length + verifs.lots.length} accent
-            sub={verifs.operators.length + ' operadores · ' + verifs.lots.length + ' parqueos'} />
+          <AdmStat label="Verificaciones pendientes" value={verifs.operators.length + verifs.lots.length + verifs.edits.length} accent
+            sub={verifs.operators.length + ' oper. · ' + verifs.lots.length + ' parq. · ' + verifs.edits.length + ' edic.'} />
           <AdmStat label={'Usos efectivos (' + (period === 'todos' ? 'total' : period) + ')'} value={effectiveInPeriod.length}
             sub={effectiveInPeriod.filter(function(e){return e.role==='conductor';}).length + ' de conductores · ' + effectiveInPeriod.filter(function(e){return e.role==='operador';}).length + ' de operadores'} />
           <AdmStat label="Eventos registrados" value={events.length} sub="máx. 5000 · los más antiguos rotan" />
         </div>
 
         {/* Verification review queue */}
-        <VerificationQueue operators={verifs.operators} lots={verifs.lots} onReviewed={verifs.refresh} />
+        <VerificationQueue operators={verifs.operators} lots={verifs.lots} edits={verifs.edits} onReviewed={verifs.refresh} />
 
         {/* Users table */}
         <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 12, overflow: 'hidden' }}>

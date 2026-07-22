@@ -419,15 +419,113 @@ function CreateLotDrawer({ pendingLatLng, onSave, onCancel, onChange }) {
   );
 }
 
+// ─── Edit Lot Drawer (listing details — needs admin approval) ────────────────
+
+function EditLotDrawer({ lot, onSubmit, onCancel }) {
+  var [form, setForm] = React.useState({
+    name: lot.name || '', address: lot.address || '', total: lot.total || 1,
+    terrain: lot.terrain || 'pavimentado', covered: !!lot.covered, keyRequired: !!lot.keyRequired,
+    security: lot.security || [], hours: lot.hours || '',
+  });
+  var [photoIds, setPhotoIds] = React.useState([]);
+  var [photoErr, setPhotoErr] = React.useState(null);
+  var [err, setErr] = React.useState(null);
+  var [saving, setSaving] = React.useState(false);
+  var set = function(patch) { setForm(function(f) { return Object.assign({}, f, patch); }); };
+
+  // Only the fields that actually changed are sent as the proposed edit.
+  var changes = (function() {
+    var c = {};
+    ['name', 'address', 'total', 'terrain', 'covered', 'keyRequired', 'hours'].forEach(function(k) {
+      if (form[k] !== lot[k]) c[k] = form[k];
+    });
+    if (JSON.stringify(form.security || []) !== JSON.stringify(lot.security || [])) c.security = form.security;
+    return c;
+  })();
+  var hasChanges = Object.keys(changes).length > 0;
+  var canSubmit = form.name.trim() && form.address.trim() && form.total >= 1 && photoIds.length >= 3 && hasChanges && !saving;
+
+  function submit() {
+    setSaving(true); setErr(null);
+    window.LlamitaApi.req('POST', '/api/operator/lot/' + encodeURIComponent(lot.id) + '/edit', { changes: changes, photoIds: photoIds })
+      .then(function() { setSaving(false); onSubmit(); })
+      .catch(function(e) { setSaving(false); setErr(window.LlamitaApi.errorMessage(e)); });
+  }
+
+  return (
+    <div style={{ width: 320, height: '100%', background: '#fff', borderLeft: '1px solid #eee', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ padding: '14px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 14, color: '#111' }}>Editar parqueo</div>
+          <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>Requiere revisión del administrador</div>
+        </div>
+        <button onClick={onCancel} style={{ background: 'none', border: 'none', fontSize: 18, color: '#aaa', cursor: 'pointer', lineHeight: 1 }}>×</button>
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+        <div style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(243,156,18,0.08)', border: '1px solid rgba(243,156,18,0.3)', marginBottom: 14, fontSize: 11, color: '#b7770d', lineHeight: 1.5 }}>
+          Los cambios se publican recién cuando un administrador los aprueba. Mientras tanto, el parqueo sigue visible con su información actual.
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div><FieldLabel>Nombre del parqueo *</FieldLabel><Input value={form.name} onChange={function(v) { set({ name: v }); }} /></div>
+          <div><FieldLabel>Dirección *</FieldLabel><Input value={form.address} onChange={function(v) { set({ address: v }); }} /></div>
+          <div><FieldLabel>Capacidad total (espacios)</FieldLabel><Input value={form.total} onChange={function(v) { set({ total: parseInt(v) || 1 }); }} type="number" min="1" mono suffix="esp." /></div>
+          <div>
+            <FieldLabel>Tipo de terreno</FieldLabel>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {['pavimentado', 'gravilla', 'tierra'].map(function(t) {
+                return (
+                  <button key={t} onClick={function() { set({ terrain: t }); }} style={{
+                    flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 11,
+                    border: '1px solid ' + (form.terrain === t ? 'var(--c-accent)' : '#ddd'),
+                    background: form.terrain === t ? 'rgba(45,143,94,0.08)' : '#fff',
+                    color: form.terrain === t ? 'var(--c-accent)' : '#666', cursor: 'pointer', textTransform: 'capitalize',
+                  }}>{t}</button>
+                );
+              })}
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 0', borderTop: '1px solid #f5f5f5', borderBottom: '1px solid #f5f5f5' }}>
+            <Toggle value={form.covered} onChange={function(v) { set({ covered: v }); }} label="Cubierto" />
+            <Toggle value={form.keyRequired} onChange={function(v) { set({ keyRequired: v }); }} label="Entrega de llave obligatoria" />
+          </div>
+          <div><FieldLabel>Seguridad</FieldLabel><MultiChip options={['Cámaras', 'Guardia']} value={form.security} onChange={function(v) { set({ security: v }); }} /></div>
+          <div><FieldLabel>Horario</FieldLabel><Input value={form.hours} onChange={function(v) { set({ hours: v }); }} /></div>
+          <div style={{ paddingTop: 10, borderTop: '1px solid #f5f5f5' }}>
+            <div style={{ fontWeight: 600, fontSize: 12, color: '#111', marginBottom: 4 }}>Fotos de respaldo *</div>
+            <div style={{ fontSize: 11, color: '#999', marginBottom: 10, lineHeight: 1.5 }}>Sube al menos 3 fotos actuales del parqueo que respalden los cambios.</div>
+            <LotPhotos value={photoIds} onChange={setPhotoIds} onError={function(c) { setPhotoErr(window.LlamitaApi.errorMessage({ message: c })); }} />
+            {photoErr && <div style={{ color: '#c0392b', fontSize: 11, marginTop: 6 }}>{photoErr}</div>}
+          </div>
+          {!hasChanges && <div style={{ fontSize: 11, color: '#999' }}>Modifica algún dato para poder enviar la edición.</div>}
+          {err && <div style={{ color: '#c0392b', fontSize: 12 }}>{err}</div>}
+        </div>
+      </div>
+      <div style={{ padding: '12px 16px', borderTop: '1px solid #f0f0f0', display: 'flex', gap: 8 }}>
+        <Btn variant="ghost" onClick={onCancel} fullWidth>Cancelar</Btn>
+        <Btn variant="accent" onClick={submit} disabled={!canSubmit} fullWidth>{saving ? 'Enviando…' : 'Enviar a revisión'}</Btn>
+      </div>
+    </div>
+  );
+}
+
 // ─── Map & Lots Section ──────────────────────────────────────────────────────
 
-function MapSection({ store, lots, lot, onSelectLot, session }) {
-  var { pulseLotId, toggleFull, addLot } = store;
+function MapSection({ store, lots, lot, onSelectLot, session, lotEdits, refreshEdits }) {
+  var { pulseLotId, toggleFull, addLot, deleteLot } = store;
   var [creating, setCreating] = React.useState(false);
   var [pendingLatLng, setPendingLatLng] = React.useState(null);
+  var [editing, setEditing] = React.useState(null);
+  var [confirmDel, setConfirmDel] = React.useState(null);
+  var edits = lotEdits || {};
 
-  function startCreate() { setCreating(true); setPendingLatLng(null); }
+  function startCreate() { setCreating(true); setPendingLatLng(null); setEditing(null); }
   function cancelCreate() { setCreating(false); setPendingLatLng(null); }
+
+  function doDelete(id) {
+    setConfirmDel(null);
+    Promise.resolve(deleteLot(id)).then(function() { if (refreshEdits) refreshEdits(); });
+    if (onSelectLot) onSelectLot(null);
+  }
 
   function handleSave(form) {
     var photoIds = form.photoIds || [];
@@ -481,6 +579,9 @@ function MapSection({ store, lots, lot, onSelectLot, session }) {
                   <div style={{ fontSize: 12, fontWeight: 600, color: '#111', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.name}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
                     <LotStatusPill status={l.status} />
+                    {edits[l.id] && edits[l.id].status === 'pending' && (
+                      <span title="Edición en revisión" style={{ fontSize: 10, color: '#E67E22' }}>✎</span>
+                    )}
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#aaa' }}>{isFull ? 'LLENO' : avail + '/' + l.total + ' libres'}</span>
                   </div>
                 </div>
@@ -553,6 +654,42 @@ function MapSection({ store, lots, lot, onSelectLot, session }) {
               style={{ marginTop: 10 }}>
               {full ? 'Marcar disponible' : 'Marcar como lleno'}
             </Btn>
+            {edits[selectedLot.id] && edits[selectedLot.id].status === 'pending' && (
+              <div style={{ marginTop: 8, fontSize: 10, color: '#E67E22', textAlign: 'center', lineHeight: 1.4 }}>
+                ✎ Edición en revisión — se publicará al ser aprobada.
+              </div>
+            )}
+            {edits[selectedLot.id] && edits[selectedLot.id].status === 'rejected' && (
+              <div style={{ marginTop: 8, fontSize: 10, color: '#E74C3C', textAlign: 'center', lineHeight: 1.4 }}>
+                ✕ Edición rechazada{edits[selectedLot.id].rejectReason ? ': ' + edits[selectedLot.id].rejectReason : ''}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <Btn variant="ghost" size="sm" onClick={function() { setEditing(selectedLot); }} fullWidth
+                disabled={selectedLot.status !== 'approved' || (edits[selectedLot.id] && edits[selectedLot.id].status === 'pending')}>
+                Editar
+              </Btn>
+              <Btn variant="ghost" size="sm" onClick={function() { setConfirmDel(selectedLot); }} fullWidth
+                style={{ color: '#E74C3C', borderColor: 'rgba(231,76,60,0.4)' }}>
+                Eliminar
+              </Btn>
+            </div>
+          </div>
+        )}
+
+        {/* Delete confirmation */}
+        {confirmDel && (
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 1300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+            <div style={{ background: '#fff', borderRadius: 14, padding: 22, maxWidth: 320, boxShadow: '0 10px 40px rgba(0,0,0,0.2)' }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#111' }}>¿Eliminar “{confirmDel.name}”?</div>
+              <div style={{ fontSize: 12, color: '#777', marginTop: 8, lineHeight: 1.6 }}>
+                El parqueo se quitará del mapa de los conductores y se borrarán sus fotos. Esta acción no se puede deshacer.
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
+                <Btn variant="ghost" onClick={function() { setConfirmDel(null); }} fullWidth>Cancelar</Btn>
+                <Btn variant="accent" onClick={function() { doDelete(confirmDel.id); }} fullWidth style={{ background: '#E74C3C', borderColor: '#E74C3C' }}>Eliminar</Btn>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -564,6 +701,15 @@ function MapSection({ store, lots, lot, onSelectLot, session }) {
           onSave={handleSave}
           onCancel={cancelCreate}
           onChange={setPendingLatLng}
+        />
+      )}
+
+      {/* Edit lot drawer */}
+      {editing && (
+        <EditLotDrawer
+          lot={editing}
+          onSubmit={function() { setEditing(null); if (refreshEdits) refreshEdits(); }}
+          onCancel={function() { setEditing(null); }}
         />
       )}
     </div>
@@ -1153,6 +1299,23 @@ function useMyVerifStatus(sess) {
   };
 }
 
+// Polls the operator's own pending/rejected lot edits (keyed by lotId) so the
+// dashboard can badge lots that have an edit awaiting or refused review.
+function useMyLotEdits(sess) {
+  var [edits, setEdits] = React.useState({});
+  var pull = React.useCallback(function() {
+    if (!sess || sess.role !== 'operador') return;
+    if (!window.LlamitaApi || !window.LlamitaApi.isAvailable()) return;
+    window.LlamitaApi.req('GET', '/api/operator/edits').then(function(r) { setEdits(r.edits || {}); }).catch(function() {});
+  }, [sess && sess.id, sess && sess.role]);
+  React.useEffect(function() {
+    pull();
+    var id = setInterval(pull, 8000);
+    return function() { clearInterval(id); };
+  }, [pull]);
+  return { edits: edits, refresh: pull };
+}
+
 // Full-screen gate shown to operators until an admin approves their identity.
 function OperatorVerificationGate({ session, status, rejectReason, onSubmitted, onSignOut }) {
   var [docs, setDocs] = React.useState({ id_front: null, id_back: null, selfie: null, business: null });
@@ -1247,6 +1410,7 @@ function OwnerApp({ store, session, onSignOut }) {
 
   // Identity verification: operators can't reach the dashboard until approved.
   var verif = useMyVerifStatus(sess);
+  var lotEdits = useMyLotEdits(sess);
   var apiUp = !!(window.LlamitaApi && window.LlamitaApi.isAvailable());
 
   // Owners only manage their own lots; the shared driver map shows everyone's.
@@ -1341,7 +1505,7 @@ function OwnerApp({ store, session, onSignOut }) {
       {/* Content */}
       <div style={{ flex: 1, padding: effectiveTab === 'mapa' ? 12 : 16, overflow: effectiveTab === 'mapa' ? 'hidden' : 'auto', minHeight: 0 }}>
         {lot && effectiveTab === 'operaciones' && <OperationsSection store={store} lot={lot} now={now} />}
-        {effectiveTab === 'mapa' && <MapSection store={store} lots={myLots} lot={lot} onSelectLot={setLotId} session={sess} />}
+        {effectiveTab === 'mapa' && <MapSection store={store} lots={myLots} lot={lot} onSelectLot={setLotId} session={sess} lotEdits={lotEdits.edits} refreshEdits={lotEdits.refresh} />}
         {lot && effectiveTab === 'registro'    && <RegistrySection store={store} lot={lot} />}
         {lot && effectiveTab === 'tarifas'     && <FeesSection store={store} lot={lot} />}
       </div>
