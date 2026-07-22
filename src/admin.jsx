@@ -218,7 +218,7 @@ function VerificationQueue({ operators, lots, onReviewed }) {
     p.then(function() { setBusy(null); onReviewed(); }).catch(function() { setBusy(null); onReviewed(); });
   }
   return (
-    <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 12, overflow: 'hidden' }}>
+    <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 12, overflow: 'hidden', flexShrink: 0 }}>
       <div style={{ padding: '10px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', gap: 10 }}>
         <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Verificaciones pendientes</h3>
         <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
