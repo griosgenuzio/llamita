@@ -12,6 +12,13 @@
     'font:600 13px/1.4 -apple-system,sans-serif!important;color:#111!important;' +
     'box-shadow:0 2px 10px rgba(0,0,0,.12)!important;white-space:nowrap!important}' +
     '.leaflet-tooltip.llamita-tt::before{display:none!important}' +
+    // Permanent count label sitting beside each marker (free spaces / LLENO).
+    '.llamita-lbl{background:#fff!important;border:1px solid rgba(0,0,0,.12)!important;' +
+    'border-radius:999px!important;padding:1px 7px!important;' +
+    'font:700 11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace!important;color:#111!important;' +
+    'box-shadow:0 1px 4px rgba(0,0,0,.18)!important;white-space:nowrap!important}' +
+    '.llamita-lbl .lbl-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;vertical-align:middle}' +
+    '.leaflet-tooltip.llamita-lbl::before{display:none!important}' +
     '.leaflet-control-attribution{font-size:9px!important}';
   document.head.appendChild(s);
 }());
@@ -50,6 +57,13 @@ function LeafletParkingMap({ lots, selectedId, onSelect, filterFn, pulseLotId })
       var color      = full ? FULL : AVAIL;
       var radius     = isSelected ? 14 : 10;
       var opacity    = visible ? 0.92 : 0.20;
+      var avail      = Math.max(0, lot.total - lot.occupied);
+
+      // Persistent compact label beside each marker: a colour dot + free-space
+      // count (or LLENO when full). Name stays on the list / selection card.
+      var label = full
+        ? '<span class="lbl-dot" style="background:' + FULL + '"></span><b style="color:' + FULL + '">LLENO</b>'
+        : '<span class="lbl-dot" style="background:' + AVAIL + '"></span><b>' + avail + '</b>';
 
       var style = {
         radius:      radius,
@@ -63,19 +77,23 @@ function LeafletParkingMap({ lots, selectedId, onSelect, filterFn, pulseLotId })
       if (markersRef.current[lot.id]) {
         markersRef.current[lot.id].setStyle(style);
         markersRef.current[lot.id].setRadius(radius);
+        markersRef.current[lot.id].setTooltipContent(label);
       } else {
         var m = L.circleMarker([lot.lat, lot.lng], style);
         (function(l) {
           m.on('click', function() { onSelectRef.current(l); });
         }(lot));
-        m.bindTooltip(lot.name, {
-          permanent:  false,
-          direction:  'top',
-          className:  'llamita-tt',
+        m.bindTooltip(label, {
+          permanent:  true,
+          direction:  'right',
+          offset:     [10, 0],
+          className:  'llamita-lbl',
         });
         m.addTo(map);
         markersRef.current[lot.id] = m;
       }
+      var tt = markersRef.current[lot.id].getTooltip();
+      if (tt && tt.setOpacity) tt.setOpacity(visible ? 1 : 0.25);
     });
   }
 

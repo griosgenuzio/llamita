@@ -513,7 +513,7 @@ function MapSection({ store, lots, lot, onSelectLot, session }) {
           <div style={{
             position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
             background: 'rgba(255,255,255,0.97)', border: '1px solid #e8e8e8',
-            borderRadius: 14, padding: '22px 26px', textAlign: 'center', zIndex: 5,
+            borderRadius: 14, padding: '22px 26px', textAlign: 'center', zIndex: 1200,
             boxShadow: '0 6px 24px rgba(0,0,0,0.10)', maxWidth: 300,
           }}>
             <div style={{ fontSize: 30, marginBottom: 8 }}>🅿️</div>
@@ -532,7 +532,7 @@ function MapSection({ store, lots, lot, onSelectLot, session }) {
             background: 'rgba(255,255,255,0.97)', border: '1px solid #e8e8e8',
             borderRadius: 12, padding: 14,
             boxShadow: '0 4px 20px rgba(0,0,0,0.10)',
-            backdropFilter: 'blur(8px)', zIndex: 5,
+            backdropFilter: 'blur(8px)', zIndex: 1200,
           }}>
             <Pill tone={full ? 'full' : 'avail'}>{full ? '● LLENO' : '● ' + (selectedLot.total - selectedLot.occupied) + ' libres'}</Pill>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#111', marginTop: 8, lineHeight: 1.3 }}>{selectedLot.name}</div>
@@ -979,7 +979,7 @@ function OwnerUserMenu({ session, onSignOut }) {
         <span style={{ width: 24, height: 24, borderRadius: '50%', background: 'rgba(45,143,94,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, color: 'var(--c-accent)' }}>{session.initials}</span>
       </button>
       {open && (
-        <div style={{ position: 'absolute', top: '110%', right: 0, minWidth: 220, padding: 6, borderRadius: 10, background: '#fff', border: '1px solid #eee', boxShadow: '0 8px 24px rgba(0,0,0,0.10)', zIndex: 100 }}>
+        <div style={{ position: 'absolute', top: '110%', right: 0, minWidth: 220, padding: 6, borderRadius: 10, background: '#fff', border: '1px solid #eee', boxShadow: '0 8px 24px rgba(0,0,0,0.10)', zIndex: 2000 }}>
           <div style={{ padding: '8px 10px 10px', borderBottom: '1px solid #f0f0f0' }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: '#111' }}>{session.name}</div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#aaa', marginTop: 2 }}>{session.email}</div>
