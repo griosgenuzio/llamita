@@ -56,10 +56,9 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <script>
-    // Frontend hosted apart from the backend (e.g. GitHub Pages + Railway)?
-    // Uncomment and point to your deployed server; leave commented when the
-    // app is served by node server/server.js (same origin) or runs offline.
-     window.LLAMITA_API_BASE = 'https://llamita-production.up.railway.app/';
+    // The frontend is served by the backend (Railway), so the API is same-origin
+    // — this works on the Railway URL and on the custom domain alike. Only set
+    // window.LLAMITA_API_BASE if you ever host the frontend apart from the server.
   </script>
   <script type="text/babel" src="src/api.jsx"></script>
   <script type="text/babel" src="src/analytics.jsx"></script>
