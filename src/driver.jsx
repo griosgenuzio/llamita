@@ -241,7 +241,7 @@ function DriverApp({ store, session, onSignOut }) {
         {/* nav row */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pointerEvents: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <img src="assets/brand/logo-horizontal.png" alt="Llamita" style={{ height: 30, width: 'auto', display: 'block' }} />
+            <img src="assets/brand/logo-horizontal.png" alt="Llamita" style={{ height: 40, width: 'auto', display: 'block' }} />
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--c-muted)' }}>· conductor</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

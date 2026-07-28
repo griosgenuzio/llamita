@@ -398,7 +398,7 @@ function AdminApp({ store, session, onSignOut }) {
       {/* Header */}
       <div style={{ padding: '11px 20px', borderBottom: '1px solid #eee', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <img src="assets/brand/logo-horizontal.png" alt="Llamita" style={{ height: 26, width: 'auto', display: 'block' }} />
+          <img src="assets/brand/logo-horizontal.png" alt="Llamita" style={{ height: 36, width: 'auto', display: 'block' }} />
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--c-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginLeft: 2 }}>administración</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

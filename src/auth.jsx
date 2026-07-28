@@ -307,7 +307,7 @@ function AuthScreen() {
         borderRight: '1px solid var(--c-border)',
       }} className="auth-hero">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <img src="assets/brand/logo-horizontal.png" alt="Llamita" style={{ height: 34, width: 'auto', display: 'block' }} />
+          <img src="assets/brand/logo-horizontal.png" alt="Llamita" style={{ height: 46, width: 'auto', display: 'block' }} />
           <span style={{
             fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--c-muted)',
             textTransform: 'uppercase', letterSpacing: '0.1em', marginLeft: 4,
@@ -413,7 +413,7 @@ function AuthScreen() {
           <div className="auth-mobile-header" style={{
             display: 'none', alignItems: 'center', gap: 10, marginBottom: 24,
           }}>
-            <img src="assets/brand/logo-horizontal.png" alt="Llamita" style={{ height: 30, width: 'auto', display: 'block' }} />
+            <img src="assets/brand/logo-horizontal.png" alt="Llamita" style={{ height: 40, width: 'auto', display: 'block' }} />
           </div>
 
           {/* tab toggle */}

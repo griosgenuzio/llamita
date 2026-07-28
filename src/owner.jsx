@@ -1341,7 +1341,7 @@ function OperatorVerificationGate({ session, status, rejectReason, onSubmitted, 
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--c-bg)', fontFamily: 'var(--font-sans)', color: '#111' }}>
       <div style={{ padding: '11px 20px', borderBottom: '1px solid #eee', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <img src="assets/brand/logo-horizontal.png" alt="Llamita" style={{ height: 26, width: 'auto', display: 'block' }} />
+          <img src="assets/brand/logo-horizontal.png" alt="Llamita" style={{ height: 36, width: 'auto', display: 'block' }} />
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--c-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginLeft: 2 }}>operador</span>
         </div>
         <OwnerUserMenu session={session} onSignOut={onSignOut || function() {}} />
@@ -1452,7 +1452,7 @@ function OwnerApp({ store, session, onSignOut }) {
       <div style={{ padding: '11px 20px', borderBottom: '1px solid #eee', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <img src="assets/brand/logo-horizontal.png" alt="Llamita" style={{ height: 26, width: 'auto', display: 'block' }} />
+            <img src="assets/brand/logo-horizontal.png" alt="Llamita" style={{ height: 36, width: 'auto', display: 'block' }} />
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--c-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginLeft: 2 }}>operador</span>
           </div>
           {myLots.length > 0 && (
