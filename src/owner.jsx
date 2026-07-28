@@ -45,7 +45,7 @@ function Pill({ tone, children }) {
     default: { bg: '#f0f0f0', fg: '#888' },
     avail:   { bg: 'rgba(39,174,96,0.12)',  fg: '#27AE60' },
     full:    { bg: 'rgba(231,76,60,0.10)',  fg: '#E74C3C' },
-    accent:  { bg: 'rgba(45,143,94,0.12)', fg: 'var(--c-accent)' },
+    accent:  { bg: 'rgba(163,230,53,0.12)', fg: 'var(--c-accent)' },
     warn:    { bg: 'rgba(243,156,18,0.12)', fg: '#F39C12' },
   };
   var p = palettes[tone] || palettes.default;
@@ -91,9 +91,9 @@ function Input({ value, onChange, suffix, placeholder, type, mono, min, max, ste
 function Btn({ variant, onClick, children, disabled, size, fullWidth, icon }) {
   var s = size === 'sm' ? { p: '6px 11px', fs: 12 } : { p: '9px 14px', fs: 13 };
   var v = {
-    primary: { bg: '#111', fg: '#fff', bd: '#111' },
-    ghost:   { bg: 'transparent', fg: '#444', bd: '#ddd' },
-    accent:  { bg: 'var(--c-accent)', fg: '#fff', bd: 'var(--c-accent)' },
+    primary: { bg: 'var(--c-accent)', fg: '#fff', bd: 'var(--c-accent)' },
+    ghost:   { bg: 'transparent', fg: 'var(--c-accent)', bd: 'var(--c-border)' },
+    accent:  { bg: 'var(--c-lime)', fg: 'var(--c-accent)', bd: 'var(--c-lime)' },
     danger:  { bg: 'rgba(231,76,60,0.08)', fg: '#E74C3C', bd: 'rgba(231,76,60,0.3)' },
     warn:    { bg: '#F39C12', fg: '#fff', bd: '#F39C12' },
   }[variant || 'primary'];
@@ -142,7 +142,7 @@ function MultiChip({ options, value, onChange }) {
           }} style={{
             padding: '5px 11px', borderRadius: 999, fontSize: 12,
             border: '1px solid ' + (active ? 'var(--c-accent)' : '#ddd'),
-            background: active ? 'rgba(45,143,94,0.10)' : '#fff',
+            background: active ? 'rgba(163,230,53,0.10)' : '#fff',
             color: active ? 'var(--c-accent)' : '#666',
             cursor: 'pointer', fontFamily: 'var(--font-sans)',
           }}>{o}</button>
@@ -350,7 +350,7 @@ function CreateLotDrawer({ pendingLatLng, onSave, onCancel, onChange }) {
                     <button key={t} onClick={function() { set({ terrain: t }); }} style={{
                       flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 11,
                       border: '1px solid ' + (form.terrain === t ? 'var(--c-accent)' : '#ddd'),
-                      background: form.terrain === t ? 'rgba(45,143,94,0.08)' : '#fff',
+                      background: form.terrain === t ? 'rgba(163,230,53,0.08)' : '#fff',
                       color: form.terrain === t ? 'var(--c-accent)' : '#666',
                       cursor: 'pointer', textTransform: 'capitalize',
                     }}>{t}</button>
@@ -477,7 +477,7 @@ function EditLotDrawer({ lot, onSubmit, onCancel }) {
                   <button key={t} onClick={function() { set({ terrain: t }); }} style={{
                     flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 11,
                     border: '1px solid ' + (form.terrain === t ? 'var(--c-accent)' : '#ddd'),
-                    background: form.terrain === t ? 'rgba(45,143,94,0.08)' : '#fff',
+                    background: form.terrain === t ? 'rgba(163,230,53,0.08)' : '#fff',
                     color: form.terrain === t ? 'var(--c-accent)' : '#666', cursor: 'pointer', textTransform: 'capitalize',
                   }}>{t}</button>
                 );
@@ -571,7 +571,7 @@ function MapSection({ store, lots, lot, onSelectLot, session, lotEdits, refreshE
                 width: '100%', textAlign: 'left', padding: '10px 14px', border: 'none',
                 borderTop: '1px solid #f5f5f5',
                 borderLeft: sel ? '3px solid var(--c-accent)' : '3px solid transparent',
-                background: sel ? 'rgba(45,143,94,0.05)' : '#fff',
+                background: sel ? 'rgba(163,230,53,0.05)' : '#fff',
                 cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
               }}>
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: isFull ? '#E74C3C' : '#27AE60', flexShrink: 0 }}/>
@@ -803,7 +803,7 @@ function OperationsSection({ store, lot, now }) {
                   display: 'grid', gridTemplateColumns: '80px 1fr auto', gap: 10, alignItems: 'center',
                   padding: '10px 16px', borderTop: '1px solid #f5f5f5', border: 'none',
                   borderLeft: isSel ? '3px solid var(--c-accent)' : '3px solid transparent',
-                  background: isSel ? 'rgba(45,143,94,0.05)' : '#fff',
+                  background: isSel ? 'rgba(163,230,53,0.05)' : '#fff',
                 }}>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', color: '#111' }}>{s.plate}</span>
                   <span style={{ fontSize: 12, color: '#888', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.driver} · {s.spot}</span>
@@ -885,7 +885,7 @@ function OperationsSection({ store, lot, now }) {
 
               <div style={{
                 padding: 14, borderRadius: 10,
-                background: 'rgba(45,143,94,0.07)', border: '1px solid rgba(45,143,94,0.20)',
+                background: 'rgba(163,230,53,0.07)', border: '1px solid rgba(163,230,53,0.20)',
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               }}>
                 <div>
@@ -1122,7 +1122,7 @@ function OwnerUserMenu({ session, onSignOut }) {
         borderRadius: 999, border: '1px solid #e5e5e5', background: '#fff', cursor: 'pointer',
       }}>
         <span style={{ fontSize: 12, color: '#111', fontWeight: 500 }}>{session.name}</span>
-        <span style={{ width: 24, height: 24, borderRadius: '50%', background: 'rgba(45,143,94,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, color: 'var(--c-accent)' }}>{session.initials}</span>
+        <span style={{ width: 24, height: 24, borderRadius: '50%', background: 'rgba(163,230,53,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, color: 'var(--c-accent)' }}>{session.initials}</span>
       </button>
       {open && (
         <div style={{ position: 'absolute', top: '110%', right: 0, minWidth: 220, padding: 6, borderRadius: 10, background: '#fff', border: '1px solid #eee', boxShadow: '0 8px 24px rgba(0,0,0,0.10)', zIndex: 2000 }}>
@@ -1203,7 +1203,7 @@ function DocUpload({ label, hint, purpose, value, onUploaded, onError }) {
   return (
     <label style={{
       display: 'block', border: '1px dashed ' + (done ? 'var(--c-accent)' : '#ccc'),
-      borderRadius: 10, padding: 10, cursor: 'pointer', background: done ? 'rgba(45,143,94,0.05)' : '#fafafa',
+      borderRadius: 10, padding: 10, cursor: 'pointer', background: done ? 'rgba(163,230,53,0.05)' : '#fafafa',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{
@@ -1341,9 +1341,8 @@ function OperatorVerificationGate({ session, status, rejectReason, onSubmitted, 
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--c-bg)', fontFamily: 'var(--font-sans)', color: '#111' }}>
       <div style={{ padding: '11px 20px', borderBottom: '1px solid #eee', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 26, height: 26, borderRadius: 7, background: 'var(--c-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, color: '#fff' }}>L</div>
-          <span style={{ fontWeight: 700, fontSize: 14 }}>llamita</span>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.1em', marginLeft: 2 }}>operador</span>
+          <img src="assets/brand/logo-horizontal.png" alt="Llamita" style={{ height: 26, width: 'auto', display: 'block' }} />
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--c-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginLeft: 2 }}>operador</span>
         </div>
         <OwnerUserMenu session={session} onSignOut={onSignOut || function() {}} />
       </div>
@@ -1453,9 +1452,8 @@ function OwnerApp({ store, session, onSignOut }) {
       <div style={{ padding: '11px 20px', borderBottom: '1px solid #eee', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 26, height: 26, borderRadius: 7, background: 'var(--c-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, color: '#fff' }}>L</div>
-            <span style={{ fontWeight: 700, fontSize: 14, letterSpacing: '-0.01em' }}>llamita</span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.1em', marginLeft: 2 }}>operador</span>
+            <img src="assets/brand/logo-horizontal.png" alt="Llamita" style={{ height: 26, width: 'auto', display: 'block' }} />
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--c-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginLeft: 2 }}>operador</span>
           </div>
           {myLots.length > 0 && (
             <React.Fragment>

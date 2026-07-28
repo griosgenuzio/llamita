@@ -241,13 +241,8 @@ function DriverApp({ store, session, onSignOut }) {
         {/* nav row */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pointerEvents: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{
-              width: 30, height: 30, borderRadius: 9, background: 'var(--c-accent)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 15, fontWeight: 700, color: '#fff',
-            }}>L</div>
-            <span style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-0.02em', color: '#111' }}>llamita</span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#999' }}>· conductor</span>
+            <img src="assets/brand/logo-horizontal.png" alt="Llamita" style={{ height: 30, width: 'auto', display: 'block' }} />
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--c-muted)' }}>· conductor</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {/* mapa / lista toggle */}

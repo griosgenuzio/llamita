@@ -184,7 +184,7 @@ function AInput({ value, onChange, type = 'text', placeholder, autoFocus, autoCo
 
 function AButton({ children, onClick, disabled, variant = 'primary', type = 'button' }) {
   const styles = {
-    primary: { bg: 'var(--c-accent)', fg: 'white', bd: 'var(--c-accent)' },
+    primary: { bg: 'var(--c-lime)', fg: 'var(--c-accent)', bd: 'var(--c-lime)' },
     ghost:   { bg: 'transparent', fg: 'var(--c-text)', bd: 'var(--c-border)' },
   }[variant];
   return (
@@ -307,12 +307,7 @@ function AuthScreen() {
         borderRight: '1px solid var(--c-border)',
       }} className="auth-hero">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 30, height: 30, borderRadius: 8, background: 'var(--c-accent)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, color: 'white',
-          }}>L</div>
-          <span style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>llamita</span>
+          <img src="assets/brand/logo-horizontal.png" alt="Llamita" style={{ height: 34, width: 'auto', display: 'block' }} />
           <span style={{
             fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--c-muted)',
             textTransform: 'uppercase', letterSpacing: '0.1em', marginLeft: 4,
@@ -418,12 +413,7 @@ function AuthScreen() {
           <div className="auth-mobile-header" style={{
             display: 'none', alignItems: 'center', gap: 10, marginBottom: 24,
           }}>
-            <div style={{
-              width: 28, height: 28, borderRadius: 7, background: 'var(--c-accent)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700, color: 'white',
-            }}>L</div>
-            <span style={{ fontSize: 16, fontWeight: 600 }}>llamita</span>
+            <img src="assets/brand/logo-horizontal.png" alt="Llamita" style={{ height: 30, width: 'auto', display: 'block' }} />
           </div>
 
           {/* tab toggle */}

@@ -127,7 +127,7 @@ var ADM_TD = { padding: '9px 14px', fontSize: 12, color: '#333', whiteSpace: 'no
 function RolePill({ role }) {
   var map = {
     conductor: { bg: 'rgba(52,152,219,0.10)', fg: '#2980B9', label: 'conductor' },
-    operador:  { bg: 'rgba(45,143,94,0.12)',  fg: 'var(--c-accent)', label: 'operador' },
+    operador:  { bg: 'rgba(163,230,53,0.12)',  fg: 'var(--c-accent)', label: 'operador' },
     admin:     { bg: 'rgba(0,0,0,0.07)',      fg: '#555', label: 'admin' },
     anonimo:   { bg: '#f0f0f0',               fg: '#999', label: 'anónimo' },
   };
@@ -398,9 +398,8 @@ function AdminApp({ store, session, onSignOut }) {
       {/* Header */}
       <div style={{ padding: '11px 20px', borderBottom: '1px solid #eee', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 26, height: 26, borderRadius: 7, background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, color: '#fff' }}>L</div>
-          <span style={{ fontWeight: 700, fontSize: 14 }}>llamita</span>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.1em', marginLeft: 2 }}>administración</span>
+          <img src="assets/brand/logo-horizontal.png" alt="Llamita" style={{ height: 26, width: 'auto', display: 'block' }} />
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--c-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginLeft: 2 }}>administración</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 12, color: '#888' }}>{sess.email}</span>

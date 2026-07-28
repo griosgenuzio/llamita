@@ -1,0 +1,13 @@
+{
+  "name": "Llamita · Parqueos La Paz",
+  "short_name": "Llamita",
+  "description": "Encuentra parqueo en La Paz en tiempo real.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#052E22",
+  "theme_color": "#052E22",
+  "icons": [
+    { "src": "assets/brand/app-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/brand/app-icon-1024.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

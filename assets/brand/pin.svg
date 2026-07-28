@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 370 150" width="370" height="150">
+  <g transform="translate(8,15) scale(0.8)">
+    <path d="M60 4 a54 54 0 0 1 54 54 c0 38 -54 82 -54 82 s-54 -44 -54 -82 a54 54 0 0 1 54 -54 Z" fill="#A3E635"/>
+    <circle cx="60" cy="58" r="38" fill="#052E22"/>
+    <path d="M47 56 Q49 34 54 36 Q58 38 57 54 Z" fill="#A3E635"/>
+    <path d="M73 56 Q71 34 66 36 Q62 38 63 54 Z" fill="#A3E635"/>
+    <rect x="44" y="49" width="32" height="27" rx="13" fill="#A3E635"/>
+    <rect x="51" y="66" width="18" height="24" rx="8" fill="#A3E635"/>
+    <circle cx="52" cy="57" r="2.4" fill="#052E22"/>
+    <circle cx="68" cy="57" r="2.4" fill="#052E22"/>
+    <path d="M54 64 Q60 68 66 64" fill="none" stroke="#052E22" stroke-width="1.8" stroke-linecap="round"/>
+  </g>
+  <path d="M135.6 52 Q137.6 30 142.6 32 Q146.6 34 145.6 50 Z" fill="#A3E635"/>
+  <path d="M162.8 52 Q160.8 30 155.8 32 Q151.8 34 152.8 50 Z" fill="#A3E635"/>
+  <text x="130" y="100" font-family="DejaVu Sans" font-weight="bold" font-size="56" fill="#FFFFFF">llamita</text>
+</svg>
