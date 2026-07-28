@@ -2,9 +2,49 @@
 <html lang="es-BO"><head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Llamita · Parqueos La Paz</title>
+  <title>Llamita — Parqueos en La Paz en tiempo real</title>
+  <meta name="description" content="Encuentra parqueo disponible en La Paz y El Alto en un mapa en vivo. Llamita muestra qué parqueos tienen espacio libre ahora; los operadores actualizan su disponibilidad al instante.">
+  <meta name="keywords" content="parqueo La Paz, parqueos La Paz, estacionamiento La Paz, parqueo El Alto, dónde parquear en La Paz, parqueo cerca, Llamita">
+  <meta name="robots" content="index, follow">
   <meta name="theme-color" content="#052E22">
-  <meta name="description" content="Encuentra parqueo en La Paz en tiempo real.">
+  <link rel="canonical" href="https://parqueosllamita.com/">
+  <meta name="geo.region" content="BO-L">
+  <meta name="geo.placename" content="La Paz, Bolivia">
+
+  <!-- Open Graph (WhatsApp, Facebook, LinkedIn) -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Llamita">
+  <meta property="og:title" content="Llamita — Parqueos en La Paz en tiempo real">
+  <meta property="og:description" content="Mapa en vivo de parqueos con espacio libre en La Paz y El Alto. Encuentra dónde estacionar al instante.">
+  <meta property="og:url" content="https://parqueosllamita.com/">
+  <meta property="og:image" content="https://parqueosllamita.com/assets/brand/app-icon-1024.png">
+  <meta property="og:locale" content="es_BO">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Llamita — Parqueos en La Paz en tiempo real">
+  <meta name="twitter:description" content="Mapa en vivo de parqueos con espacio libre en La Paz y El Alto.">
+  <meta name="twitter:image" content="https://parqueosllamita.com/assets/brand/app-icon-1024.png">
+
+  <!-- Structured data for rich search results -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Llamita",
+    "url": "https://parqueosllamita.com/",
+    "description": "Mapa en vivo de parqueos con espacio libre en La Paz y El Alto, Bolivia. Los conductores ven la disponibilidad en tiempo real y los operadores la actualizan al instante.",
+    "applicationCategory": "TravelApplication",
+    "operatingSystem": "Web",
+    "inLanguage": "es-BO",
+    "areaServed": [
+      { "@type": "City", "name": "La Paz" },
+      { "@type": "City", "name": "El Alto" }
+    ],
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "BOB" },
+    "publisher": { "@type": "Organization", "name": "Llamita", "url": "https://parqueosllamita.com/" }
+  }
+  </script>
 
   <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
@@ -46,7 +86,20 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 <body>
-  <div id="root"></div>
+  <div id="root">
+    <!-- Static landing: real content for search engines + a branded loading
+         splash for users. React replaces this once the app mounts. -->
+    <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px;font-family:'Geomini',system-ui,sans-serif;color:#052E22;background:#F4F7F2">
+      <img src="assets/brand/logo-horizontal.png" alt="Llamita — parqueos en La Paz" width="220" style="max-width:70vw;height:auto">
+      <h1 style="font-size:26px;font-weight:700;margin:22px 0 10px;max-width:520px;line-height:1.2">Encuentra parqueo en La Paz, en tiempo real</h1>
+      <p style="font-size:15px;color:#5B6B62;max-width:480px;line-height:1.6;margin:0">
+        Llamita muestra en un mapa en vivo qué parqueos tienen espacio libre en La Paz y El Alto.
+        Los conductores ven la disponibilidad al instante y los operadores la actualizan en tiempo real.
+      </p>
+      <p style="font-family:'Open Sans',system-ui,sans-serif;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#5B6B62;margin-top:28px">Cargando la aplicación…</p>
+      <noscript><p style="margin-top:16px;color:#5B6B62">Esta aplicación necesita JavaScript para mostrar el mapa en vivo.</p></noscript>
+    </div>
+  </div>
 
   
 
