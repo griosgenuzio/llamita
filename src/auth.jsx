@@ -571,6 +571,42 @@ function AuthScreen() {
             </form>
           )}
 
+          {/* mobile value strip (visible when the desktop hero is hidden) —
+              placed below the form so signing in stays the first action. */}
+          <div className="auth-mobile-hero" style={{ display: 'none', marginTop: 28 }}>
+            <div style={{ height: 1, background: 'var(--c-border)', marginBottom: 24 }} />
+            <h2 style={{
+              margin: 0, fontSize: 19, fontWeight: 600, lineHeight: 1.2,
+              letterSpacing: '-0.01em', color: 'var(--c-text)',
+            }}>
+              Encuentra parqueo en La Paz, al instante.
+            </h2>
+            <p style={{ margin: '10px 0 0', fontSize: 13, color: 'var(--c-muted)', lineHeight: 1.6 }}>
+              Una sola plataforma con dos vistas. Los conductores ven en el mapa qué parqueos tienen cupos. Los operadores actualizan el estado y registran cobros en vivo.
+            </p>
+            <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {[
+                ['🚗', 'Para conductores', 'Mapa con pines verdes (disponible) o rojos (lleno) y características de cada parqueo.'],
+                ['🅿️', 'Para operadores', 'Toggle de estado en vivo, check-in/out, registro de ventas descargable y tarifas configurables.'],
+                ['⟳',  'Sincronización en vivo', 'El cambio en el panel del operador aparece en la app del conductor en segundos.'],
+              ].map(([icon, t, d]) => (
+                <div key={t} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                  <div style={{
+                    width: 28, height: 28, borderRadius: 8,
+                    background: 'color-mix(in oklch, var(--c-accent) 12%, var(--c-surface))',
+                    border: '1px solid var(--c-border)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 14, flexShrink: 0,
+                  }}>{icon}</div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--c-text)' }}>{t}</div>
+                    <div style={{ fontSize: 12, color: 'var(--c-muted)', marginTop: 2, lineHeight: 1.5 }}>{d}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -578,6 +614,7 @@ function AuthScreen() {
         @media (max-width: 900px) {
           .auth-hero { display: none !important; }
           .auth-mobile-header { display: flex !important; }
+          .auth-mobile-hero { display: block !important; }
         }
       `}</style>
     </div>

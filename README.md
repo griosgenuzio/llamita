@@ -12,6 +12,19 @@ npm start
 
 Abre <http://localhost:8080>. Cuentas, parqueos y eventos se guardan en `server/llamita.db` (SQLite).
 
+El servidor sigue sin dependencias en tiempo de ejecución. `npm install` solo hace falta para **editar el frontend** (ver abajo).
+
+## Editar el frontend (build)
+
+El frontend en `src/*.jsx` se **precompila** a `dist/*.js` con esbuild, así el navegador no descarga el compilador de Babel (~3 MB) ni transpila en el teléfono. El resultado (`dist/`) está versionado, por eso la app corre y se abre sin build.
+
+Si cambias algo en `src/`, reconstruye y commitea `dist/`:
+
+```
+npm install   # una sola vez — instala esbuild (solo desarrollo)
+npm run build # src/*.jsx → dist/*.js
+```
+
 Variables de entorno opcionales: `PORT`, `LLAMITA_DB`, `LLAMITA_ADMIN_EMAIL`, `LLAMITA_ADMIN_PASSWORD` (cámbiala en producción).
 
 ## Verificación de correo al registrarse
@@ -62,7 +75,9 @@ Abre `index.html` desde cualquier hosting estático (por ejemplo GitHub Pages). 
 ## Estructura
 
 ```
-index.html          página única (React + Babel standalone + Leaflet)
+index.html          página única (React + Leaflet); carga dist/*.js compilado
+build.mjs           compila src/*.jsx → dist/*.js (esbuild, solo desarrollo)
+dist/               JavaScript compilado que sirve la app (versionado)
 src/api.jsx         cliente del backend (con fallback offline)
 src/analytics.jsx   telemetría de uso (registro de eventos)
 src/auth.jsx        registro / inicio de sesión

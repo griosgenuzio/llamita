@@ -4,9 +4,15 @@
   "private": true,
   "description": "Parqueos en La Paz — mapa en vivo para conductores y panel para operadores",
   "scripts": {
-    "start": "node server/server.js"
+    "start": "node server/server.js",
+    "build": "node build.mjs"
   },
   "engines": {
     "node": "24.x"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   }
 }
