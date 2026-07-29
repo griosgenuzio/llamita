@@ -519,10 +519,13 @@ function MapSection({ store, lots, lot, onSelectLot, session, lotEdits, refreshE
   var [pendingLatLng, setPendingLatLng] = React.useState(null);
   var [editing, setEditing] = React.useState(null);
   var [confirmDel, setConfirmDel] = React.useState(null);
+  var [cardOpen, setCardOpen] = React.useState(false); // mobile: show the lot card only after a lot is tapped
   var edits = lotEdits || {};
 
   function startCreate() { setCreating(true); setPendingLatLng(null); setEditing(null); }
   function cancelCreate() { setCreating(false); setPendingLatLng(null); }
+  // Tapping a marker or a sidebar lot selects it and (on mobile) opens its card.
+  function handleSelect(id) { if (onSelectLot) onSelectLot(id); setCardOpen(true); }
 
   function doDelete(id) {
     setConfirmDel(null);
@@ -570,7 +573,7 @@ function MapSection({ store, lots, lot, onSelectLot, session, lotEdits, refreshE
             var isFull = l.occupied >= l.total;
             var avail = l.total - l.occupied;
             return (
-              <button key={l.id} onClick={function() { onSelectLot(l.id); }} style={{
+              <button key={l.id} onClick={function() { handleSelect(l.id); }} style={{
                 width: '100%', textAlign: 'left', padding: '10px 14px', border: 'none',
                 borderTop: '1px solid #f5f5f5',
                 borderLeft: sel ? '3px solid var(--c-accent)' : '3px solid transparent',
@@ -606,11 +609,23 @@ function MapSection({ store, lots, lot, onSelectLot, session, lotEdits, refreshE
         <OwnerLeafletMap
           lots={lots}
           selectedId={selId}
-          onSelectLot={onSelectLot}
+          onSelectLot={handleSelect}
           placingMode={creating}
           onPlace={setPendingLatLng}
           pendingLatLng={pendingLatLng}
         />
+
+        {/* Mobile: compact total-lots chip when no card is open (keeps the map clean) */}
+        {!creating && isMobile && !cardOpen && lots.length > 0 && (
+          <div style={{
+            position: 'absolute', top: 12, left: 12, zIndex: 1200,
+            background: 'rgba(255,255,255,0.95)', border: '1px solid #e8e8e8', borderRadius: 999,
+            padding: '6px 12px', boxShadow: '0 2px 10px rgba(0,0,0,0.08)',
+            fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: 'var(--c-accent)',
+          }}>
+            {lots.length} parqueo{lots.length !== 1 ? 's' : ''} · toca un pin para ver
+          </div>
+        )}
 
         {/* First-run prompt over the map */}
         {!creating && lots.length === 0 && (
@@ -629,15 +644,25 @@ function MapSection({ store, lots, lot, onSelectLot, session, lotEdits, refreshE
           </div>
         )}
 
-        {/* Selected lot floating card (top-right of map) */}
-        {!creating && selectedLot && (
+        {/* Selected lot floating card — top-right on desktop; on mobile only after
+            a pin/lot is tapped, anchored bottom so it doesn't crowd the map. */}
+        {!creating && selectedLot && (!isMobile || cardOpen) && (
           <div style={{
-            position: 'absolute', right: 12, top: 12, width: 220,
+            position: 'absolute',
+            right: 12, left: isMobile ? 12 : 'auto',
+            top: isMobile ? 'auto' : 12, bottom: isMobile ? 12 : 'auto',
+            width: isMobile ? 'auto' : 220,
             background: 'rgba(255,255,255,0.97)', border: '1px solid #e8e8e8',
             borderRadius: 12, padding: 14,
-            boxShadow: '0 4px 20px rgba(0,0,0,0.10)',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.14)',
             backdropFilter: 'blur(8px)', zIndex: 1200,
           }}>
+            {isMobile && (
+              <button onClick={function() { setCardOpen(false); }} style={{
+                position: 'absolute', top: 8, right: 10, background: 'none', border: 'none',
+                fontSize: 18, color: '#aaa', cursor: 'pointer', lineHeight: 1,
+              }}>×</button>
+            )}
             <Pill tone={full ? 'full' : 'avail'}>{full ? '● LLENO' : '● ' + (selectedLot.total - selectedLot.occupied) + ' libres'}</Pill>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#111', marginTop: 8, lineHeight: 1.3 }}>{selectedLot.name}</div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#aaa', marginTop: 3 }}>{selectedLot.address}</div>
@@ -697,8 +722,29 @@ function MapSection({ store, lots, lot, onSelectLot, session, lotEdits, refreshE
         )}
       </div>
 
-      {/* Create lot drawer — full-screen overlay on mobile, side panel on desktop */}
-      {creating && (
+      {/* Mobile create — step 1: place the pin on a full-screen map (the drawer
+          would otherwise cover the map, leaving nowhere to tap). */}
+      {isMobile && creating && !pendingLatLng && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: '#fff', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: '#111' }}>Nuevo parqueo</div>
+              <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>Paso 1 de 2 · Ubica en el mapa</div>
+            </div>
+            <button onClick={cancelCreate} style={{ background: 'none', border: 'none', fontSize: 20, color: '#aaa', cursor: 'pointer', lineHeight: 1 }}>×</button>
+          </div>
+          <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+            <OwnerLeafletMap lots={lots} selectedId={null} onSelectLot={function() {}} placingMode={true} onPlace={setPendingLatLng} pendingLatLng={pendingLatLng} />
+            <div style={{ position: 'absolute', top: 12, left: 12, right: 12, zIndex: 1200, background: 'rgba(255,255,255,0.96)', border: '1px solid #e8e8e8', borderRadius: 10, padding: '10px 12px', textAlign: 'center', fontSize: 13, color: '#555', boxShadow: '0 2px 12px rgba(0,0,0,0.12)' }}>
+              📍 Toca el punto exacto de tu parqueo en el mapa
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create lot drawer — form step. Full-screen overlay on mobile (only once a
+          location is picked), side panel on desktop (handles both steps). */}
+      {creating && (!isMobile || pendingLatLng) && (
         <div style={isMobile ? { position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', background: '#fff' } : { display: 'contents' }}>
           <CreateLotDrawer
             pendingLatLng={pendingLatLng}
@@ -762,16 +808,20 @@ function OperationsSection({ store, lot, now }) {
         <div style={{ padding: 16, borderRadius: 12, background: '#fff', border: '1px solid #eee' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Estado en vivo</h3>
                 <Pill tone={isFull ? 'full' : 'avail'}>{isFull ? '● lleno' : '● ' + available + ' libres'}</Pill>
-                {pulseLotId === lot.id && <Pill tone="accent">⟳ sync</Pill>}
               </div>
-              <div style={{ fontSize: 11, color: '#aaa', marginTop: 3 }}>Visible a conductores en tiempo real.</div>
+              <div style={{ fontSize: 11, color: '#aaa', marginTop: 3 }}>
+                Visible a conductores en tiempo real.
+                {pulseLotId === lot.id && <span style={{ color: 'var(--c-accent)', fontWeight: 600 }}> · ⟳ sincronizando…</span>}
+              </div>
             </div>
-            <Btn variant={isFull ? 'ghost' : 'primary'} onClick={function() { toggleFull(lot.id); }} size="sm">
-              {isFull ? 'Marcar disponible' : 'Marcar lleno'}
-            </Btn>
+            <span style={{ flexShrink: 0 }}>
+              <Btn variant={isFull ? 'ghost' : 'primary'} onClick={function() { toggleFull(lot.id); }} size="sm">
+                {isFull ? 'Marcar disponible' : 'Marcar lleno'}
+              </Btn>
+            </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 28, fontWeight: 700, color: isFull ? '#E74C3C' : '#27AE60', minWidth: 76 }}>
