@@ -1014,13 +1014,13 @@ function RegistrySection({ store, lot }) {
         <StatCard label="Promedio / vehículo" value={formatBs(filtered.length ? total/filtered.length : 0)} />
       </div>
 
-      <div style={{ flex: 1, background: '#fff', border: '1px solid #eee', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '10px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ flex: isMobile ? 'none' : 1, background: '#fff', border: '1px solid #eee', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '10px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', gap: isMobile ? 10 : 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Registro de ventas</h3>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#aaa' }}>{lot.name}</span>
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', padding: 2, borderRadius: 8, background: '#f5f5f5', gap: 2 }}>
               {[['todos','Todos'],['hoy','Hoy'],['ayer','Ayer']].map(function(x) {
                 return (
@@ -1040,7 +1040,7 @@ function RegistrySection({ store, lot }) {
           </div>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }}>
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto', minHeight: isMobile ? 120 : 0, maxHeight: isMobile ? '55vh' : 'none' }}>
           <table style={{ width: '100%', minWidth: 520, borderCollapse: 'collapse', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
             <thead style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
               <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
