@@ -9,6 +9,7 @@
 var _useEvents   = window.LlamitaAnalytics.useEvents;
 var _getAccounts = window.LlamitaAuth.getAccounts;
 var _formatBs    = window.LlamitaData.formatBs;
+var _useIsMobile = window.LlamitaData.useIsMobile;
 
 var EVENT_LABELS = {
   session_started:     'Ingreso a la app',
@@ -461,6 +462,7 @@ function RefLotCreator({ store, references }) {
 }
 
 function AdminApp({ store, session, onSignOut }) {
+  var isMobile = _useIsMobile();
   var lots     = store.lots;
   var events   = _useEvents();
   var accounts = useAccounts();
@@ -520,16 +522,16 @@ function AdminApp({ store, session, onSignOut }) {
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--c-bg)', fontFamily: 'var(--font-sans)', color: '#111', fontSize: 13 }}>
       {/* Header */}
-      <div style={{ padding: '11px 20px', borderBottom: '1px solid #eee', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <img src="assets/brand/logo-horizontal.png" alt="Llamita" style={{ height: 36, width: 'auto', display: 'block' }} />
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--c-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginLeft: 2 }}>administración</span>
+      <div style={{ padding: isMobile ? '9px 12px' : '11px 20px', borderBottom: '1px solid #eee', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <img src="assets/brand/logo-horizontal.png" alt="Llamita" style={{ height: isMobile ? 30 : 36, width: 'auto', display: 'block' }} />
+          {!isMobile && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--c-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginLeft: 2 }}>administración</span>}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 12, color: '#888' }}>{sess.email}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+          {!isMobile && <span style={{ fontSize: 12, color: '#888' }}>{sess.email}</span>}
           <button onClick={onSignOut} style={{
             padding: '6px 12px', borderRadius: 8, border: '1px solid #ddd', background: '#fff',
-            fontFamily: 'var(--font-sans)', fontSize: 12, color: '#444', cursor: 'pointer',
+            fontFamily: 'var(--font-sans)', fontSize: 12, color: '#444', cursor: 'pointer', whiteSpace: 'nowrap',
           }}>Cerrar sesión</button>
         </div>
       </div>

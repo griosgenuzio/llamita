@@ -257,7 +257,22 @@ function useLlamitaStore() {
   };
 }
 
+// Reactive viewport check for responsive layouts (default breakpoint 640px).
+function useIsMobile(bp) {
+  const q = '(max-width: ' + (bp || 640) + 'px)';
+  const get = () => { try { return window.matchMedia(q).matches; } catch (e) { return false; } };
+  const [m, setM] = React.useState(get);
+  React.useEffect(() => {
+    const mq = window.matchMedia(q);
+    const h = () => setM(mq.matches);
+    h();
+    if (mq.addEventListener) mq.addEventListener('change', h); else mq.addListener(h);
+    return () => { if (mq.removeEventListener) mq.removeEventListener('change', h); else mq.removeListener(h); };
+  }, [q]);
+  return m;
+}
+
 window.LlamitaData = {
-  useLlamitaStore,
+  useLlamitaStore, useIsMobile,
   formatBs, parseHM, fmtDuration, calcPrice,
 };

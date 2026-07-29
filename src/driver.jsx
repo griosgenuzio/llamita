@@ -243,6 +243,7 @@ function DriverApp({ store, session, onSignOut }) {
   const [selectedId, setSelectedId] = React.useState(null);
   const [filters, setFilters] = React.useState({ available: false, covered: false, key: false });
   const [view, setView] = React.useState('mapa');
+  const [showRefs, setShowRefs] = React.useState(false); // references in the list, on demand
 
   const sess = session || { name: 'Conductor', email: '', initials: 'C', role: 'conductor' };
   const handleSignOut = onSignOut || (() => {});
@@ -272,6 +273,7 @@ function DriverApp({ store, session, onSignOut }) {
   // Reference lots are admin-placed pins with no availability — kept off the
   // list/counts/filters (they still render on the map via their own marker).
   const standard  = approved.filter(l => l.kind !== 'reference');
+  const references = approved.filter(l => l.kind === 'reference');
   const selected  = approved.find(l => l.id === selectedId); // may be a reference pin
   const visible   = standard.filter(filterFn);
   const totalAvail = visible.reduce((s, l) => s + Math.max(0, l.total - l.occupied), 0);
@@ -391,6 +393,34 @@ function DriverApp({ store, session, onSignOut }) {
                 </button>
               );
             })}
+
+            {/* Reference lots — shown on demand (no availability data) */}
+            {references.length > 0 && (
+              <button onClick={() => setShowRefs(v => !v)} style={{
+                marginTop: 6, padding: '10px 14px', borderRadius: 10,
+                border: '1px solid var(--c-border)', background: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 600,
+                color: 'var(--c-accent)',
+              }}>
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: 'rgba(5,46,34,0.5)', border: '2px solid #fff', boxShadow: '0 0 0 1px rgba(5,46,34,0.25)' }}/>
+                {showRefs ? 'Ocultar referencias' : `Ver ${references.length} parqueo${references.length !== 1 ? 's' : ''} de referencia`}
+              </button>
+            )}
+            {showRefs && references.map(lot => (
+              <button key={lot.id} onClick={() => { selectLot(lot.id); setView('mapa'); }} style={{
+                textAlign: 'left', padding: '14px 16px', borderRadius: 12,
+                border: '1px dashed var(--c-border)', background: '#fbfcfb',
+                display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
+              }}>
+                <span style={{ width: 12, height: 12, borderRadius: '50%', flexShrink: 0, background: 'rgba(5,46,34,0.5)', border: '2px solid #fff', boxShadow: '0 0 0 3px rgba(5,46,34,0.10)' }}/>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lot.name}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#999', marginTop: 2 }}>{lot.address}</div>
+                </div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, color: 'var(--c-accent)', flexShrink: 0 }}>REFERENCIA</div>
+              </button>
+            ))}
           </div>
         </div>
       )}

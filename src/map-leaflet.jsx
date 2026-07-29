@@ -57,15 +57,15 @@ function LeafletParkingMap({ lots, selectedId, onSelect, filterFn, pulseLotId })
 
       if (lot.kind === 'reference') {
         // Reference lot: an admin-placed location pin with no availability data.
-        // A distinct dark verde-noche ℹ badge (never green/orange/red), and it
-        // ignores the availability filter chips (always shown).
+        // A small translucent verde-noche dot (never a green/orange/red pill),
+        // and it ignores the availability filter chips (always shown).
         visible = true;
         label =
-          '<span style="background:' + REF + ';color:#fff;width:22px;height:22px;border-radius:50%;' +
-          'display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;font-style:italic;' +
-          'border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.35)' +
+          '<span style="width:16px;height:16px;border-radius:50%;display:inline-block;' +
+          'background:rgba(5,46,34,' + (isSelected ? '0.9' : '0.5') + ');border:2px solid #fff;' +
+          'box-shadow:0 1px 4px rgba(0,0,0,.25)' +
           (isSelected ? ';outline:2px solid ' + REF + ';outline-offset:1px' : '') +
-          '">i</span>';
+          '"></span>';
       } else {
         // ONE mark per standard lot: a coloured pill centred on the location with
         // the free-space count (or LLENO). Colour by availability.

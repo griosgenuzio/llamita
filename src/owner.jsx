@@ -1,7 +1,7 @@
 // owner.jsx — Owner dashboard
 // window.LlamitaOwner = { OwnerApp }
 
-const { formatBs, parseHM, fmtDuration, calcPrice } = window.LlamitaData;
+const { formatBs, parseHM, fmtDuration, calcPrice, useIsMobile } = window.LlamitaData;
 
 // ─── Utilities ──────────────────────────────────────────────────────────────
 
@@ -76,12 +76,12 @@ function FieldLabel({ children }) {
 
 function Input({ value, onChange, suffix, placeholder, type, mono, min, max, step }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #e5e5e5', borderRadius: 8, background: '#fff', padding: '0 10px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #e5e5e5', borderRadius: 8, background: '#fff', padding: '0 10px', minWidth: 0 }}>
       <input
         type={type || 'text'} value={value == null ? '' : value}
         onChange={function(e) { if (onChange) onChange(e.target.value); }}
         placeholder={placeholder} min={min} max={max} step={step}
-        style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', padding: '8px 0', fontFamily: mono ? 'var(--font-mono)' : 'var(--font-sans)', fontSize: 13, color: '#111' }}
+        style={{ flex: 1, minWidth: 0, width: '100%', border: 'none', outline: 'none', background: 'transparent', padding: '8px 0', fontFamily: mono ? 'var(--font-mono)' : 'var(--font-sans)', fontSize: 13, color: '#111' }}
       />
       {suffix && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#aaa', marginLeft: 6 }}>{suffix}</span>}
     </div>
@@ -278,6 +278,7 @@ var DEFAULT_LOT_FORM = {
 };
 
 function CreateLotDrawer({ pendingLatLng, onSave, onCancel, onChange }) {
+  var isMobile = useIsMobile();
   var [form, setForm] = React.useState(DEFAULT_LOT_FORM);
   var [photoIds, setPhotoIds] = React.useState([]);
   var [photoErr, setPhotoErr] = React.useState(null);
@@ -288,7 +289,7 @@ function CreateLotDrawer({ pendingLatLng, onSave, onCancel, onChange }) {
 
   return (
     <div style={{
-      width: 320, height: '100%', background: '#fff', borderLeft: '1px solid #eee',
+      width: isMobile ? '100%' : 320, height: '100%', background: '#fff', borderLeft: isMobile ? 'none' : '1px solid #eee',
       display: 'flex', flexDirection: 'column', overflow: 'hidden',
     }}>
       {/* Header */}
@@ -422,6 +423,7 @@ function CreateLotDrawer({ pendingLatLng, onSave, onCancel, onChange }) {
 // ─── Edit Lot Drawer (listing details — needs admin approval) ────────────────
 
 function EditLotDrawer({ lot, onSubmit, onCancel }) {
+  var isMobile = useIsMobile();
   var [form, setForm] = React.useState({
     name: lot.name || '', address: lot.address || '', total: lot.total || 1,
     terrain: lot.terrain || 'pavimentado', covered: !!lot.covered, keyRequired: !!lot.keyRequired,
@@ -453,7 +455,7 @@ function EditLotDrawer({ lot, onSubmit, onCancel }) {
   }
 
   return (
-    <div style={{ width: 320, height: '100%', background: '#fff', borderLeft: '1px solid #eee', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ width: isMobile ? '100%' : 320, height: '100%', background: '#fff', borderLeft: isMobile ? 'none' : '1px solid #eee', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={{ padding: '14px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <div style={{ fontWeight: 700, fontSize: 14, color: '#111' }}>Editar parqueo</div>
@@ -511,6 +513,7 @@ function EditLotDrawer({ lot, onSubmit, onCancel }) {
 // ─── Map & Lots Section ──────────────────────────────────────────────────────
 
 function MapSection({ store, lots, lot, onSelectLot, session, lotEdits, refreshEdits }) {
+  var isMobile = useIsMobile();
   var { pulseLotId, toggleFull, addLot, deleteLot } = store;
   var [creating, setCreating] = React.useState(false);
   var [pendingLatLng, setPendingLatLng] = React.useState(null);
@@ -549,9 +552,9 @@ function MapSection({ store, lots, lot, onSelectLot, session, lotEdits, refreshE
   var full = selectedLot ? selectedLot.occupied >= selectedLot.total : false;
 
   return (
-    <div style={{ display: 'flex', height: '100%', gap: 0, border: '1px solid #eee', borderRadius: 12, overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', height: isMobile ? 'auto' : '100%', gap: 0, border: '1px solid #eee', borderRadius: 12, overflow: 'hidden' }}>
       {/* Lot list sidebar */}
-      <div style={{ width: 240, borderRight: '1px solid #eee', display: 'flex', flexDirection: 'column', background: '#fff', flexShrink: 0 }}>
+      <div style={{ width: isMobile ? '100%' : 240, borderRight: isMobile ? 'none' : '1px solid #eee', borderBottom: isMobile ? '1px solid #eee' : 'none', display: 'flex', flexDirection: 'column', background: '#fff', flexShrink: 0 }}>
         <div style={{ padding: '12px 14px', borderBottom: '1px solid #f0f0f0' }}>
           <div style={{ fontWeight: 700, fontSize: 13, color: '#111' }}>Mis parqueos</div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#aaa', marginTop: 2 }}>{lots.length} ubicaciones</div>
@@ -599,7 +602,7 @@ function MapSection({ store, lots, lot, onSelectLot, session, lotEdits, refreshE
       </div>
 
       {/* Map area */}
-      <div style={{ flex: 1, position: 'relative', minWidth: 0 }}>
+      <div style={{ flex: isMobile ? 'none' : 1, height: isMobile ? '58vh' : 'auto', minHeight: isMobile ? 340 : 0, position: 'relative', minWidth: 0 }}>
         <OwnerLeafletMap
           lots={lots}
           selectedId={selId}
@@ -694,23 +697,27 @@ function MapSection({ store, lots, lot, onSelectLot, session, lotEdits, refreshE
         )}
       </div>
 
-      {/* Create lot drawer */}
+      {/* Create lot drawer — full-screen overlay on mobile, side panel on desktop */}
       {creating && (
-        <CreateLotDrawer
-          pendingLatLng={pendingLatLng}
-          onSave={handleSave}
-          onCancel={cancelCreate}
-          onChange={setPendingLatLng}
-        />
+        <div style={isMobile ? { position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', background: '#fff' } : { display: 'contents' }}>
+          <CreateLotDrawer
+            pendingLatLng={pendingLatLng}
+            onSave={handleSave}
+            onCancel={cancelCreate}
+            onChange={setPendingLatLng}
+          />
+        </div>
       )}
 
       {/* Edit lot drawer */}
       {editing && (
-        <EditLotDrawer
-          lot={editing}
-          onSubmit={function() { setEditing(null); if (refreshEdits) refreshEdits(); }}
-          onCancel={function() { setEditing(null); }}
-        />
+        <div style={isMobile ? { position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', background: '#fff' } : { display: 'contents' }}>
+          <EditLotDrawer
+            lot={editing}
+            onSubmit={function() { setEditing(null); if (refreshEdits) refreshEdits(); }}
+            onCancel={function() { setEditing(null); }}
+          />
+        </div>
       )}
     </div>
   );
@@ -719,6 +726,7 @@ function MapSection({ store, lots, lot, onSelectLot, session, lotEdits, refreshE
 // ─── Operations Section ──────────────────────────────────────────────────────
 
 function OperationsSection({ store, lot, now }) {
+  var isMobile = useIsMobile();
   var { sessions, history, checkIn, checkOut, toggleFull, setOccupied, pulseLotId } = store;
   var activeSessions = sessions.filter(function(s) { return s.lot === lot.id; });
   var isFull = lot.occupied >= lot.total;
@@ -746,7 +754,7 @@ function OperationsSection({ store, lot, now }) {
   var todayRevenue = history.filter(function(h) { return h.date === today && (!h.lot || h.lot === lot.id); }).reduce(function(s,h) { return s+h.amount; }, 0);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
 
       {/* LEFT */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -822,7 +830,7 @@ function OperationsSection({ store, lot, now }) {
         {/* Check-in */}
         <div style={{ padding: 16, borderRadius: 12, background: '#fff', border: '1px solid #eee' }}>
           <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Registrar ingreso</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 0.8fr', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.2fr 1fr 0.8fr', gap: 8 }}>
             <div><FieldLabel>Placa *</FieldLabel><Input value={newPlate} onChange={setNewPlate} placeholder="0000-XYZ" mono /></div>
             <div><FieldLabel>Conductor</FieldLabel><Input value={newDriver} onChange={setNewDriver} placeholder="opcional" /></div>
             <div><FieldLabel>Lugar</FieldLabel><Input value={newSpot} onChange={setNewSpot} placeholder="A-13" mono /></div>
@@ -918,6 +926,7 @@ function OperationsSection({ store, lot, now }) {
 // ─── Registry Section ────────────────────────────────────────────────────────
 
 function RegistrySection({ store, lot }) {
+  var isMobile = useIsMobile();
   var { history } = store;
   var today = todayStr();
   var yesterday = (function() {
@@ -947,8 +956,8 @@ function RegistrySection({ store, lot }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, height: '100%' }}>
-      <div style={{ display: 'flex', gap: 12 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, height: isMobile ? 'auto' : '100%' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 12 }}>
         <StatCard label="Recaudo total" value={formatBs(total)} sub={filtered.length + ' servicios'} accent />
         <StatCard label="Efectivo"      value={formatBs(efectivo)} />
         <StatCard label="QR"            value={formatBs(qr)} />
@@ -981,8 +990,8 @@ function RegistrySection({ store, lot }) {
           </div>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }}>
+          <table style={{ width: '100%', minWidth: 520, borderCollapse: 'collapse', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
             <thead style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
               <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
                 {['Fecha','Placa','Lugar','Entrada','Salida','Duración','Método','Monto'].map(function(h) {
@@ -1025,6 +1034,7 @@ function RegistrySection({ store, lot }) {
 // ─── Fees Section ────────────────────────────────────────────────────────────
 
 function FeesSection({ store, lot }) {
+  var isMobile = useIsMobile();
   var { updateLot } = store;
   var f = lot.fees;
   var set = function(patch) { updateLot(lot.id, { fees: Object.assign({}, f, patch) }); };
@@ -1039,7 +1049,7 @@ function FeesSection({ store, lot }) {
   ];
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 16, height: '100%' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.1fr 1fr', gap: 16, height: isMobile ? 'auto' : '100%' }}>
       <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 12, padding: 16 }}>
         <h3 style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 600 }}>Parámetros de tarifa</h3>
         <div style={{ fontSize: 12, color: '#aaa', marginBottom: 16 }}>Aplica a <strong style={{ color: '#111' }}>{lot.name}</strong></div>
@@ -1084,8 +1094,8 @@ function FeesSection({ store, lot }) {
             var hours = Math.ceil(e.mins / 60);
             var amount = f.firstHour;
             if (hours > 1) amount += (hours - 1) * f.addHour;
-            if (e.weekend) amount *= f.weekendMult;
-            if (e.peak)    amount *= f.peakMult;
+            if (e.weekend) amount *= (f.weekendMult || 1);
+            if (e.peak)    amount *= (f.peakMult || 1);
             if (f.dailyCap) amount = Math.min(amount, f.dailyCap);
             amount = Math.round(amount * 100) / 100;
             return (
@@ -1410,6 +1420,7 @@ function OwnerApp({ store, session, onSignOut }) {
   // Identity verification: operators can't reach the dashboard until approved.
   var verif = useMyVerifStatus(sess);
   var lotEdits = useMyLotEdits(sess);
+  var isMobile = useIsMobile();
   var apiUp = !!(window.LlamitaApi && window.LlamitaApi.isAvailable());
 
   // Owners only manage their own lots; the shared driver map shows everyone's.
@@ -1449,19 +1460,20 @@ function OwnerApp({ store, session, onSignOut }) {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--c-bg)', fontFamily: 'var(--font-sans)', color: '#111', fontSize: 13 }}>
       {/* Header */}
-      <div style={{ padding: '11px 20px', borderBottom: '1px solid #eee', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <img src="assets/brand/logo-horizontal.png" alt="Llamita" style={{ height: 36, width: 'auto', display: 'block' }} />
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--c-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginLeft: 2 }}>operador</span>
+      <div style={{ padding: isMobile ? '9px 12px' : '11px 20px', borderBottom: '1px solid #eee', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 14, minWidth: 0, flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <img src="assets/brand/logo-horizontal.png" alt="Llamita" style={{ height: isMobile ? 30 : 36, width: 'auto', display: 'block' }} />
+            {!isMobile && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--c-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginLeft: 2 }}>operador</span>}
           </div>
           {myLots.length > 0 && (
             <React.Fragment>
-              <div style={{ width: 1, height: 18, background: '#e5e5e5' }}/>
+              {!isMobile && <div style={{ width: 1, height: 18, background: '#e5e5e5' }}/>}
               <select value={lot ? lot.id : ''} onChange={function(e) { setLotId(e.target.value); }} style={{
                 border: '1px solid #e5e5e5', borderRadius: 8, padding: '6px 28px 6px 10px',
                 fontFamily: 'var(--font-sans)', fontSize: 12, background: '#fff', color: '#111',
-                cursor: 'pointer', appearance: 'none',
+                cursor: 'pointer', appearance: 'none', minWidth: 0, maxWidth: isMobile ? 180 : 260,
+                textOverflow: 'ellipsis',
                 backgroundImage: "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M1 1l4 4 4-4' stroke='%23aaa' fill='none' stroke-width='1.5'/></svg>\")",
                 backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center',
               }}>
@@ -1470,17 +1482,19 @@ function OwnerApp({ store, session, onSignOut }) {
             </React.Fragment>
           )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)', fontSize: 10, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#27AE60', animation: 'llamita-blink 2s infinite', display: 'inline-block' }}/>
-            {now} · {date}
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
+          {!isMobile && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)', fontSize: 10, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#27AE60', animation: 'llamita-blink 2s infinite', display: 'inline-block' }}/>
+              {now} · {date}
+            </span>
+          )}
           <OwnerUserMenu session={sess} onSignOut={handleSignOut}/>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', padding: '0 12px', borderBottom: '1px solid #eee', background: '#fff' }}>
+      {/* Tabs — horizontally scrollable on small screens */}
+      <div style={{ display: 'flex', padding: '0 12px', borderBottom: '1px solid #eee', background: '#fff', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
         {tabs.map(function(t) {
           var active = effectiveTab === t.id;
           return (
@@ -1490,6 +1504,7 @@ function OwnerApp({ store, session, onSignOut }) {
               color: active ? '#111' : '#aaa',
               borderBottom: active ? '2px solid var(--c-accent)' : '2px solid transparent',
               cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, marginBottom: -1,
+              flexShrink: 0, whiteSpace: 'nowrap',
             }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d={t.icon}/>
@@ -1500,8 +1515,9 @@ function OwnerApp({ store, session, onSignOut }) {
         })}
       </div>
 
-      {/* Content */}
-      <div style={{ flex: 1, padding: effectiveTab === 'mapa' ? 12 : 16, overflow: effectiveTab === 'mapa' ? 'hidden' : 'auto', minHeight: 0 }}>
+      {/* Content — the map tab manages its own layout; other tabs scroll. On
+          mobile the map tab also scrolls (its sections stack vertically). */}
+      <div style={{ flex: 1, padding: (effectiveTab === 'mapa' && !isMobile) ? 12 : (effectiveTab === 'mapa' ? 0 : (isMobile ? 12 : 16)), overflowX: 'hidden', overflowY: (effectiveTab === 'mapa' && !isMobile) ? 'hidden' : 'auto', minHeight: 0, WebkitOverflowScrolling: 'touch' }}>
         {lot && effectiveTab === 'operaciones' && <OperationsSection store={store} lot={lot} now={now} />}
         {effectiveTab === 'mapa' && <MapSection store={store} lots={myLots} lot={lot} onSelectLot={setLotId} session={sess} lotEdits={lotEdits.edits} refreshEdits={lotEdits.refresh} />}
         {lot && effectiveTab === 'registro'    && <RegistrySection store={store} lot={lot} />}
