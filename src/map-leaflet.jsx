@@ -25,6 +25,7 @@
 var AVAIL = '#27AE60'; // 5+ free
 var LOW   = '#E67E22'; // 1–4 free
 var FULL  = '#E74C3C'; // 0 free (LLENO)
+var REF   = '#052E22'; // reference lot (verde noche — no availability)
 
 function LeafletParkingMap({ lots, selectedId, onSelect, filterFn, pulseLotId }) {
   var containerRef = React.useRef(null);
@@ -51,23 +52,36 @@ function LeafletParkingMap({ lots, selectedId, onSelect, filterFn, pulseLotId })
       // hides the marker; filterFn below merely fades, so the gate must be here.)
       if (!lot.lat || !lot.lng || lot.status !== 'approved') return;
 
-      var free       = Math.max(0, lot.total - lot.occupied);
-      var full       = free === 0;
       var isSelected = lot.id === sel;
-      var visible    = fn ? fn(lot) : true;
-      // Colour by availability: green (5+), orange (1–4), red/LLENO (0).
-      var tone       = full ? FULL : (free < 5 ? LOW : AVAIL);
+      var label, visible;
 
-      // ONE mark per lot: a single coloured pill centred on the location, with
-      // the free-space count (or LLENO). The circle marker underneath is
-      // invisible — it only provides the click/anchor target, so there is no
-      // separate location dot next to the pill.
-      var label =
-        '<span style="background:' + tone + ';color:#fff;padding:3px 9px;border-radius:999px;' +
-        'display:inline-block;font-weight:700;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.35)' +
-        (isSelected ? ';outline:2px solid ' + tone + ';outline-offset:1px' : '') +
-        '">' + (full ? 'LLENO' : free) + '</span>';
+      if (lot.kind === 'reference') {
+        // Reference lot: an admin-placed location pin with no availability data.
+        // A distinct dark verde-noche ℹ badge (never green/orange/red), and it
+        // ignores the availability filter chips (always shown).
+        visible = true;
+        label =
+          '<span style="background:' + REF + ';color:#fff;width:22px;height:22px;border-radius:50%;' +
+          'display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;font-style:italic;' +
+          'border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.35)' +
+          (isSelected ? ';outline:2px solid ' + REF + ';outline-offset:1px' : '') +
+          '">i</span>';
+      } else {
+        // ONE mark per standard lot: a coloured pill centred on the location with
+        // the free-space count (or LLENO). Colour by availability.
+        var free = Math.max(0, lot.total - lot.occupied);
+        var full = free === 0;
+        visible  = fn ? fn(lot) : true;
+        var tone = full ? FULL : (free < 5 ? LOW : AVAIL);
+        label =
+          '<span style="background:' + tone + ';color:#fff;padding:3px 9px;border-radius:999px;' +
+          'display:inline-block;font-weight:700;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.35)' +
+          (isSelected ? ';outline:2px solid ' + tone + ';outline-offset:1px' : '') +
+          '">' + (full ? 'LLENO' : free) + '</span>';
+      }
 
+      // The circle marker underneath is invisible — it only provides the
+      // click/anchor target, so there is no separate location dot next to the pill.
       var style = { radius: 18, opacity: 0, fillOpacity: 0 };
 
       if (markersRef.current[lot.id]) {

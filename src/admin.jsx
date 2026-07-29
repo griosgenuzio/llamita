@@ -123,6 +123,8 @@ function AdmChip({ active, onClick, children }) {
 
 var ADM_TH = { padding: '8px 14px', textAlign: 'left', fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.1em', color: '#aaa', textTransform: 'uppercase', fontWeight: 600, whiteSpace: 'nowrap' };
 var ADM_TD = { padding: '9px 14px', fontSize: 12, color: '#333', whiteSpace: 'nowrap' };
+var admLabel = { fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.1em', color: '#aaa', textTransform: 'uppercase', marginBottom: 4 };
+var admInput = { width: '100%', padding: '9px 11px', borderRadius: 8, border: '1px solid var(--c-border)', fontFamily: 'var(--font-sans)', fontSize: 13, color: '#111', outline: 'none', boxSizing: 'border-box' };
 
 function RolePill({ role }) {
   var map = {
@@ -339,11 +341,131 @@ function VerificationQueue({ operators, lots, edits, onReviewed }) {
   );
 }
 
+// Open "this reference lot no longer exists" reports, polled from the server.
+function useReports() {
+  var [reports, setReports] = React.useState([]);
+  var pull = React.useCallback(function() {
+    if (!window.LlamitaApi || !window.LlamitaApi.isAvailable()) return;
+    window.LlamitaApi.req('GET', '/api/admin/reports').then(function(r) { setReports(r.reports || []); }).catch(function() {});
+  }, []);
+  React.useEffect(function() {
+    var stopped = false, timer = null;
+    try { window.LlamitaApi.ready.then(function(ok) { if (!ok || stopped) return; pull(); timer = setInterval(pull, 10000); }); } catch (e) {}
+    return function() { stopped = true; clearInterval(timer); };
+  }, [pull]);
+  return { reports: reports, refresh: pull };
+}
+
+function ReportsInbox({ reports, store, onChanged }) {
+  var [busy, setBusy] = React.useState(null);
+  function resolve(id) {
+    setBusy(id);
+    window.LlamitaApi.req('POST', '/api/admin/report/' + encodeURIComponent(id) + '/resolve', {})
+      .then(function() { setBusy(null); onChanged(); }).catch(function() { setBusy(null); onChanged(); });
+  }
+  function del(rep) {
+    if (!window.confirm('¿Eliminar el parqueo de referencia "' + rep.lotName + '" del mapa?')) return;
+    setBusy(rep.id);
+    Promise.resolve(store.deleteLot(rep.lotId))
+      .then(function() { return window.LlamitaApi.req('POST', '/api/admin/report/' + encodeURIComponent(rep.id) + '/resolve', {}).catch(function() {}); })
+      .then(function() { setBusy(null); onChanged(); });
+  }
+  return (
+    <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 12, overflow: 'hidden', flexShrink: 0 }}>
+      <div style={{ padding: '10px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Parqueos reportados</h3>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: reports.length ? '#E74C3C' : '#aaa' }}>{reports.length} sin resolver</span>
+      </div>
+      <div style={{ maxHeight: 280, overflowY: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {reports.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: '#bbb', fontSize: 12 }}>Ningún conductor ha reportado un parqueo de referencia como inexistente.</div>}
+        {reports.map(function(r) {
+          return (
+            <div key={r.id} style={{ border: '1px solid #eee', borderRadius: 10, padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 13, color: '#111' }}>{r.lotName}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#888', marginTop: 2 }}>
+                  Reportado como inexistente · {fmtTs(r.createdAt)}{r.reporterName ? ' · ' + r.reporterName : ''}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={function() { resolve(r.id); }} disabled={!!busy} style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid #ddd', background: '#fff', fontSize: 12, color: '#444', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--font-sans)' }}>Resolver</button>
+                <button onClick={function() { del(r); }} disabled={!!busy} style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid #E74C3C', background: '#fff', fontSize: 12, color: '#E74C3C', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 600 }}>Eliminar parqueo</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Small Leaflet click-to-place picker for admin reference lots.
+function AdmMapPicker({ value, onPick }) {
+  var ref = React.useRef(null);
+  var mapRef = React.useRef(null);
+  var markerRef = React.useRef(null);
+  React.useEffect(function() {
+    if (!ref.current || mapRef.current || typeof L === 'undefined') return;
+    var map = L.map(ref.current, { center: [-16.505, -68.117], zoom: 13, preferCanvas: true });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 20 }).addTo(map);
+    map.on('click', function(e) { onPick({ lat: e.latlng.lat, lng: e.latlng.lng }); });
+    mapRef.current = map;
+    var t = setTimeout(function() { map.invalidateSize(); }, 60);
+    return function() { clearTimeout(t); map.remove(); mapRef.current = null; markerRef.current = null; };
+  }, []);
+  React.useEffect(function() {
+    var map = mapRef.current; if (!map || !value) return;
+    if (markerRef.current) markerRef.current.setLatLng([value.lat, value.lng]);
+    else markerRef.current = L.circleMarker([value.lat, value.lng], { radius: 9, color: '#fff', weight: 3, fillColor: '#052E22', fillOpacity: 1 }).addTo(map);
+  }, [value]);
+  return <div ref={ref} style={{ width: '100%', height: '100%' }} />;
+}
+
+function RefLotCreator({ store, references }) {
+  var [open, setOpen] = React.useState(false);
+  var [pin, setPin]   = React.useState(null);
+  var [name, setName] = React.useState('');
+  var [address, setAddress] = React.useState('');
+  var canSave = pin && name.trim();
+  function save() {
+    store.addLot({ ownerId: 'admin', kind: 'reference', name: name.trim(), address: address.trim(), lat: pin.lat, lng: pin.lng, status: 'approved' });
+    setOpen(false); setPin(null); setName(''); setAddress('');
+  }
+  return (
+    <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 12, overflow: 'hidden', flexShrink: 0 }}>
+      <div style={{ padding: '10px 16px', borderBottom: open ? '1px solid #f0f0f0' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+        <div>
+          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Parqueos de referencia</h3>
+          <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{references.length} en el mapa · solo ubicación, sin disponibilidad ni tarifas</div>
+        </div>
+        <button onClick={function() { setOpen(!open); }} style={{ padding: '7px 12px', borderRadius: 8, border: 'none', background: 'var(--c-lime)', color: 'var(--c-accent)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>{open ? 'Cerrar' : '+ Agregar parqueo'}</button>
+      </div>
+      {open && (
+        <div style={{ padding: 12, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 320px', minWidth: 280, height: 280, borderRadius: 10, overflow: 'hidden', border: '1px solid #eee' }}>
+            <AdmMapPicker value={pin} onPick={setPin} />
+          </div>
+          <div style={{ flex: '1 1 220px', minWidth: 200, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ fontSize: 12, color: '#666', lineHeight: 1.5 }}>Haz clic en el mapa para ubicar el parqueo, luego completa los datos. Aparecerá en el mapa del conductor como referencia (pin oscuro con ℹ).</div>
+            <div><div style={admLabel}>Nombre *</div><input value={name} onChange={function(e) { setName(e.target.value); }} placeholder="Parqueo Mercado Rodríguez" style={admInput} /></div>
+            <div><div style={admLabel}>Dirección</div><input value={address} onChange={function(e) { setAddress(e.target.value); }} placeholder="Calle / referencia" style={admInput} /></div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: pin ? 'var(--c-accent)' : '#bbb' }}>
+              {pin ? ('📍 ' + pin.lat.toFixed(5) + ', ' + pin.lng.toFixed(5)) : 'Sin ubicación — clic en el mapa'}
+            </div>
+            <button onClick={save} disabled={!canSave} style={{ padding: '10px', borderRadius: 8, border: 'none', background: canSave ? 'var(--c-accent)' : '#eee', color: canSave ? '#fff' : '#bbb', fontSize: 13, fontWeight: 600, cursor: canSave ? 'pointer' : 'not-allowed', fontFamily: 'var(--font-sans)' }}>Publicar referencia</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminApp({ store, session, onSignOut }) {
   var lots     = store.lots;
   var events   = _useEvents();
   var accounts = useAccounts();
   var verifs   = useVerifications();
+  var reports  = useReports();
 
   var [roleFilter, setRoleFilter] = React.useState('todos');
   var [period, setPeriod]         = React.useState('todos');
@@ -363,6 +485,8 @@ function AdminApp({ store, session, onSignOut }) {
   var drivers = accounts.filter(function(a) { return a.role === 'conductor'; });
   var owners  = accounts.filter(function(a) { return a.role === 'operador'; });
   var approvedLots = lots.filter(function(l) { return l.status === 'approved'; });
+  var refLots       = lots.filter(function(l) { return l.kind === 'reference'; });
+  var publishedLots = approvedLots.filter(function(l) { return l.kind !== 'reference'; });
 
   function userStats(u) {
     var mine = events.filter(function(ev) { return ev.userId === u.id; });
@@ -414,7 +538,7 @@ function AdminApp({ store, session, onSignOut }) {
         {/* Stats */}
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <AdmStat label="Cuentas" value={accounts.length} sub={drivers.length + ' conductores · ' + owners.length + ' operadores'} />
-          <AdmStat label="Parqueos publicados" value={approvedLots.length} sub={approvedLots.filter(function(l) { return l.occupied >= l.total; }).length + ' llenos ahora'} />
+          <AdmStat label="Parqueos publicados" value={publishedLots.length} sub={publishedLots.filter(function(l) { return l.occupied >= l.total; }).length + ' llenos · ' + refLots.length + ' de referencia'} />
           <AdmStat label="Verificaciones pendientes" value={verifs.operators.length + verifs.lots.length + verifs.edits.length} accent
             sub={verifs.operators.length + ' oper. · ' + verifs.lots.length + ' parq. · ' + verifs.edits.length + ' edic.'} />
           <AdmStat label={'Usos efectivos (' + (period === 'todos' ? 'total' : period) + ')'} value={effectiveInPeriod.length}
@@ -424,6 +548,10 @@ function AdminApp({ store, session, onSignOut }) {
 
         {/* Verification review queue */}
         <VerificationQueue operators={verifs.operators} lots={verifs.lots} edits={verifs.edits} onReviewed={verifs.refresh} />
+
+        {/* Reference lots: admin-placed reference pins + driver reports */}
+        <RefLotCreator store={store} references={refLots} />
+        <ReportsInbox reports={reports.reports} store={store} onChanged={reports.refresh} />
 
         {/* Users table */}
         <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 12, overflow: 'hidden' }}>

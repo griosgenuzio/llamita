@@ -166,6 +166,19 @@ db.exec(`
     reject_reason TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_lot_edits_status ON lot_edits (status);
+  -- Driver reports that an admin-added reference lot no longer exists.
+  CREATE TABLE IF NOT EXISTS reports (
+    id            TEXT PRIMARY KEY,
+    lot_id        TEXT NOT NULL,
+    lot_name      TEXT,
+    reporter_id   TEXT,
+    reporter_name TEXT,
+    status        TEXT NOT NULL DEFAULT 'open',   -- open | resolved
+    created_at    TEXT NOT NULL,
+    resolved_at   TEXT,
+    resolved_by   TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_reports_status ON reports (status);
   CREATE TABLE IF NOT EXISTS system_meta (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -206,6 +219,7 @@ db.prepare(`INSERT OR IGNORE INTO app_state (id, version, data)
     DELETE FROM uploads;
     DELETE FROM lot_verifications;
     DELETE FROM lot_edits;
+    DELETE FROM reports;
     UPDATE app_state SET version = 0, data = '{"lots":[],"sessions":[],"history":[]}' WHERE id = 1;
   `);
   try {
@@ -858,6 +872,46 @@ async function handleApi(req, res, pathname) {
     }
   }
 
+  // A driver flags that a reference lot no longer exists. One tap, no note.
+  if (pathname === '/api/reports' && method === 'POST') {
+    const who = authFrom(req); // may be null (report is low-trust, non-destructive)
+    const b = await readBody(req);
+    const lotId = String(b.lotId || '');
+    if (!lotId) return json(res, 400, { error: 'lot_required' });
+    const state = JSON.parse(db.prepare('SELECT data FROM app_state WHERE id = 1').get().data);
+    const lot = state.lots.find(l => l.id === lotId);
+    const lotName = lot ? lot.name : '(desconocido)';
+    // Collapse duplicate open reports for the same lot into one.
+    const existing = db.prepare("SELECT id FROM reports WHERE lot_id = ? AND status = 'open'").get(lotId);
+    if (!existing) {
+      db.prepare(`INSERT INTO reports (id,lot_id,lot_name,reporter_id,reporter_name,status,created_at)
+                  VALUES (?,?,?,?,?,'open',?)`)
+        .run(uid('rep'), lotId, lotName, who ? who.id : null, who ? who.name : 'Anónimo', nowIso());
+    }
+    return json(res, 201, { ok: true });
+  }
+
+  if (pathname === '/api/admin/reports' && method === 'GET') {
+    const who = authFrom(req);
+    if (!who || who.role !== 'admin') return json(res, 403, { error: 'forbidden' });
+    const rows = db.prepare("SELECT * FROM reports WHERE status = 'open' ORDER BY created_at DESC").all();
+    return json(res, 200, { reports: rows.map(r => ({
+      id: r.id, lotId: r.lot_id, lotName: r.lot_name,
+      reporterName: r.reporter_name, createdAt: r.created_at,
+    })) });
+  }
+
+  {
+    const m = /^\/api\/admin\/report\/([^/]+)\/resolve$/.exec(pathname);
+    if (m && method === 'POST') {
+      const who = authFrom(req);
+      if (!who || who.role !== 'admin') return json(res, 403, { error: 'forbidden' });
+      db.prepare("UPDATE reports SET status='resolved', resolved_at=?, resolved_by=? WHERE id=?")
+        .run(nowIso(), who.id, m[1]);
+      return json(res, 200, { ok: true });
+    }
+  }
+
   if (pathname === '/api/state' && method === 'GET') {
     const row = db.prepare('SELECT version, data FROM app_state WHERE id = 1').get();
     return json(res, 200, { version: row.version, state: JSON.parse(row.data) });
@@ -927,7 +981,8 @@ async function handleApi(req, res, pathname) {
         db.prepare(`INSERT INTO lot_verifications (lot_id,owner_id,status,address,photo_ids,submitted_at)
                     VALUES (?,?,?,?,?,?)`)
           .run(lot.id, who.id, 'pending', address, JSON.stringify(validPhotos), nowIso());
-        outById[lot.id] = Object.assign({}, lot, { status: 'pending' });
+        // Only admins can create reference lots — force operator lots to standard.
+        outById[lot.id] = Object.assign({}, lot, { status: 'pending', kind: 'standard' });
       }
       lots = Object.values(outById);
     }

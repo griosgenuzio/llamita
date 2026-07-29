@@ -177,6 +177,67 @@ function LotDetailSheet({ lot, onClose }) {
   );
 }
 
+// Bottom sheet for a reference lot (admin-placed pin, no managed data): explains
+// what it is and offers a one-tap "this lot no longer exists" report to Llamita.
+function ReferenceLotSheet({ lot, onClose }) {
+  const [sent, setSent] = React.useState(false);
+  const [sending, setSending] = React.useState(false);
+  const directionsUrl = lot.lat && lot.lng
+    ? `https://www.google.com/maps/dir/?api=1&destination=${lot.lat},${lot.lng}` : null;
+
+  function report() {
+    setSending(true);
+    const done = () => { setSending(false); setSent(true); };
+    try {
+      if (window.LlamitaApi && window.LlamitaApi.isAvailable()) {
+        window.LlamitaApi.req('POST', '/api/reports', { lotId: lot.id }).then(done).catch(done);
+      } else { done(); }
+    } catch (e) { done(); }
+    try { window.LlamitaAnalytics.track('reference_lot_reported', { lotId: lot.id, lotName: lot.name }); } catch (e) {}
+  }
+
+  return (
+    <div style={{
+      background: '#fff', borderRadius: '18px 18px 0 0',
+      boxShadow: '0 -8px 30px rgba(0,0,0,0.14), 0 -1px 0 rgba(0,0,0,0.06)',
+      padding: '10px 18px 32px', animation: 'llamita-sheet-up 0.25s ease-out',
+      maxHeight: '72vh', overflowY: 'auto',
+    }}>
+      <div onClick={onClose} style={{ width: 36, height: 4, borderRadius: 2, background: '#e0e0e0', margin: '0 auto 14px', cursor: 'pointer' }}/>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', color: '#999', textTransform: 'uppercase', marginBottom: 4 }}>{lot.address}</div>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#111', letterSpacing: '-0.02em' }}>{lot.name}</h2>
+        </div>
+        <div style={{ padding: '5px 11px', borderRadius: 8, flexShrink: 0, background: 'rgba(5,46,34,0.08)', color: 'var(--c-accent)', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700 }}>ℹ REFERENCIA</div>
+      </div>
+      <div style={{ border: '1px solid #f0f0f0', borderRadius: 12, padding: '12px 14px', marginBottom: 14, fontSize: 13, color: '#555', lineHeight: 1.6 }}>
+        Llamita agregó este parqueo como <b>referencia</b> porque existía cuando se registró. Llamita no gestiona su disponibilidad, tarifas ni características — confírmalas en el lugar.
+      </div>
+      {directionsUrl && (
+        <a href={directionsUrl} target="_blank" rel="noopener noreferrer" style={{
+          display: 'block', textAlign: 'center', padding: '11px', borderRadius: 10,
+          background: 'var(--c-lime)', color: 'var(--c-accent)', fontWeight: 700, fontSize: 14,
+          textDecoration: 'none', marginBottom: 10,
+        }}>Cómo llegar →</a>
+      )}
+      {sent ? (
+        <div style={{ textAlign: 'center', padding: '11px', borderRadius: 10, background: 'rgba(5,46,34,0.06)', color: 'var(--c-accent)', fontSize: 13, fontWeight: 600 }}>
+          ¡Gracias! Avisaste a Llamita.
+        </div>
+      ) : (
+        <button onClick={report} disabled={sending} style={{
+          width: '100%', padding: '11px', borderRadius: 10, border: '1px solid #E74C3C',
+          background: '#fff', color: '#E74C3C', fontFamily: 'var(--font-sans)', fontSize: 13,
+          fontWeight: 600, cursor: sending ? 'default' : 'pointer',
+        }}>
+          {sending ? 'Enviando…' : 'Este parqueo ya no existe — avisar a Llamita'}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function DriverApp({ store, session, onSignOut }) {
   const { lots, pulseLotId } = store;
   const [selectedId, setSelectedId] = React.useState(null);
@@ -208,8 +269,11 @@ function DriverApp({ store, session, onSignOut }) {
 
   // Drivers only ever see admin-approved lots (same gate as the map markers).
   const approved  = lots.filter(l => l.status === 'approved');
-  const selected  = approved.find(l => l.id === selectedId);
-  const visible   = approved.filter(filterFn);
+  // Reference lots are admin-placed pins with no availability — kept off the
+  // list/counts/filters (they still render on the map via their own marker).
+  const standard  = approved.filter(l => l.kind !== 'reference');
+  const selected  = approved.find(l => l.id === selectedId); // may be a reference pin
+  const visible   = standard.filter(filterFn);
   const totalAvail = visible.reduce((s, l) => s + Math.max(0, l.total - l.occupied), 0);
 
   return (
@@ -346,7 +410,7 @@ function DriverApp({ store, session, onSignOut }) {
               La Paz
             </div>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#111', letterSpacing: '-0.01em' }}>
-              {approved.length === 0 ? (
+              {standard.length === 0 ? (
                 'Aún no hay parqueos publicados'
               ) : (
                 <React.Fragment>
@@ -356,7 +420,7 @@ function DriverApp({ store, session, onSignOut }) {
                 </React.Fragment>
               )}
             </div>
-            {approved.length === 0 && (
+            {standard.length === 0 && (
               <div style={{ fontSize: 11, color: '#aaa', marginTop: 3 }}>
                 Los parqueos aparecerán aquí cuando los operadores los registren.
               </div>
@@ -372,7 +436,9 @@ function DriverApp({ store, session, onSignOut }) {
       {/* ── Detail bottom sheet ── */}
       {selected && (
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 20 }}>
-          <LotDetailSheet lot={selected} onClose={() => setSelectedId(null)} />
+          {selected.kind === 'reference'
+            ? <ReferenceLotSheet lot={selected} onClose={() => setSelectedId(null)} />
+            : <LotDetailSheet lot={selected} onClose={() => setSelectedId(null)} />}
         </div>
       )}
     </div>
