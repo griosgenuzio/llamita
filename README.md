@@ -88,5 +88,3 @@ src/owner.jsx       panel del operador
 src/admin.jsx       panel de administración
 server/server.js    API JSON + hosting estático + SQLite (cero dependencias)
 ```
-
-<!-- deploy check: private repo → Railway, 2026-08-01T01:29:31Z -->
