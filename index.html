@@ -46,6 +46,38 @@
   }
   </script>
 
+  <!-- Organization identity (helps entity/brand understanding) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Llamita",
+    "url": "https://parqueosllamita.com/",
+    "logo": "https://parqueosllamita.com/assets/brand/app-icon-1024.png",
+    "description": "Plataforma que muestra en un mapa en vivo qué parqueos y estacionamientos tienen espacio libre en La Paz y El Alto, Bolivia.",
+    "areaServed": [
+      { "@type": "City", "name": "La Paz" },
+      { "@type": "City", "name": "El Alto" }
+    ]
+  }
+  </script>
+
+  <!-- FAQ: captures long-tail parking queries in Spanish -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      { "@type": "Question", "name": "¿Dónde encontrar parqueo en La Paz en tiempo real?",
+        "acceptedAnswer": { "@type": "Answer", "text": "En Llamita (parqueosllamita.com) ves un mapa en vivo con los parqueos y estacionamientos que tienen espacio libre ahora mismo en La Paz y El Alto. Los que están en verde tienen cupos y los rojos están llenos." } },
+      { "@type": "Question", "name": "¿Cuánto cuesta usar Llamita para buscar parqueo o estacionamiento?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Para los conductores es gratis. Solo abres el mapa y ves la disponibilidad de parqueos en tiempo real, sin instalar nada." } },
+      { "@type": "Question", "name": "¿Llamita cubre la Zona Sur y El Alto?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Sí. Cubre La Paz y El Alto, incluyendo Centro, Sopocachi, Miraflores, San Miguel, Calacoto y toda la Zona Sur, y suma más parqueos constantemente." } }
+    ]
+  }
+  </script>
+
   <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
   <link rel="apple-touch-icon" href="assets/brand/apple-touch-icon.png">
@@ -94,11 +126,24 @@
       <img src="assets/brand/logo-horizontal.png" alt="Llamita — parqueos en La Paz" width="220" style="max-width:70vw;height:auto">
       <h1 style="font-size:26px;font-weight:700;margin:22px 0 10px;max-width:520px;line-height:1.2">Encuentra parqueo en La Paz, en tiempo real</h1>
       <p style="font-size:15px;color:#5B6B62;max-width:480px;line-height:1.6;margin:0">
-        Llamita muestra en un mapa en vivo qué parqueos tienen espacio libre en La Paz y El Alto.
+        Llamita muestra en un mapa en vivo qué parqueos y estacionamientos tienen espacio libre ahora
+        en La Paz y El Alto — Centro, Sopocachi, Miraflores, San Miguel, Calacoto y toda la Zona Sur.
         Los conductores ven la disponibilidad al instante y los operadores la actualizan en tiempo real.
       </p>
-      <p style="font-family:'Open Sans',system-ui,sans-serif;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#5B6B62;margin-top:28px">Cargando la aplicación…</p>
-      <noscript><p style="margin-top:16px;color:#5B6B62">Esta aplicación necesita JavaScript para mostrar el mapa en vivo.</p></noscript>
+      <p style="font-family:'Open Sans',system-ui,sans-serif;font-size:13px;color:#5B6B62;margin-top:18px">
+        Más información:
+        <a href="/parqueos-la-paz" style="color:#052E22">Parqueos en La Paz</a> ·
+        <a href="/estacionamientos-la-paz" style="color:#052E22">Estacionamientos en La Paz</a>
+      </p>
+      <p style="font-family:'Open Sans',system-ui,sans-serif;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#5B6B62;margin-top:22px">Cargando la aplicación…</p>
+      <noscript>
+        <p style="margin-top:16px;color:#5B6B62;max-width:480px">
+          Llamita es un mapa en vivo de parqueos y estacionamientos disponibles en La Paz y El Alto.
+          Necesitas JavaScript para ver el mapa interactivo; mientras tanto, visita
+          <a href="/parqueos-la-paz" style="color:#052E22">Parqueos en La Paz</a> o
+          <a href="/estacionamientos-la-paz" style="color:#052E22">Estacionamientos en La Paz</a>.
+        </p>
+      </noscript>
     </div>
   </div>
 

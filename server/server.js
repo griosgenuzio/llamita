@@ -1046,11 +1046,18 @@ function serveStatic(req, res, pathname) {
   if (rel === '/') rel = '/index.html';
   const file = path.join(ROOT, rel);
   if (!file.startsWith(ROOT)) { res.writeHead(403); res.end(); return; } // no traversal
-  fs.readFile(file, (err, data) => {
-    if (err) { res.writeHead(404); res.end('not found'); return; }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream' });
-    res.end(data);
-  });
+  // Clean URLs: an extensionless path (e.g. /parqueos-la-paz) resolves to the
+  // matching .html content page. Keeps SEO landing pages linkable without ".html".
+  const candidates = path.extname(file) ? [file] : [file + '.html', path.join(file, 'index.html')];
+  const trySend = (i) => {
+    if (i >= candidates.length) { res.writeHead(404); res.end('not found'); return; }
+    fs.readFile(candidates[i], (err, data) => {
+      if (err) { trySend(i + 1); return; }
+      res.writeHead(200, { 'Content-Type': MIME[path.extname(candidates[i]).toLowerCase()] || 'application/octet-stream' });
+      res.end(data);
+    });
+  };
+  trySend(0);
 }
 
 // ─────────── Server ───────────
