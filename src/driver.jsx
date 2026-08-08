@@ -339,10 +339,11 @@ function DriverApp({ store, session, onSignOut }) {
     }
   }, [userLoc]);
 
-  // Drop the route when the sheet is closed or a different lot is selected.
-  React.useEffect(() => {
-    if (route && route.lotId !== selectedId) { setRoute(null); setRouteError(null); }
-  }, [selectedId]);
+  // The drawn route persists even when the sheet is closed (it lives in a
+  // floating banner). Only reset a transient error when the selection changes;
+  // the route itself is cleared explicitly via "Cerrar ruta" / the banner ×,
+  // or replaced when directions to another lot are requested.
+  React.useEffect(() => { setRouteError(null); }, [selectedId]);
 
   const sess = session || { name: 'Conductor', email: '', initials: 'C', role: 'conductor' };
   const handleSignOut = onSignOut || (() => {});
@@ -586,8 +587,8 @@ function DriverApp({ store, session, onSignOut }) {
         </div>
       )}
 
-      {/* ── Stats pill (map, nothing selected) ── */}
-      {view === 'mapa' && !selected && (
+      {/* ── Stats pill (map, nothing selected, no active route) ── */}
+      {view === 'mapa' && !selected && !route && (
         <div style={{
           position: 'absolute', left: 16, right: 16, bottom: 24, zIndex: 10,
           padding: '12px 16px', borderRadius: 14,
@@ -623,6 +624,48 @@ function DriverApp({ store, session, onSignOut }) {
           </div>
         </div>
       )}
+
+      {/* ── Floating route banner (route active, its lot's sheet not open) ──
+          Keeps the drawn route usable after the detail sheet is closed. Tap to
+          reopen the lot; × clears the route. */}
+      {view === 'mapa' && route && (!selected || selected.id !== route.lotId) && (() => {
+        const rlot = lots.find(l => l.id === route.lotId);
+        return (
+          <div style={{
+            position: 'absolute', left: 16, right: 16, bottom: 24, zIndex: 12,
+            padding: '10px 8px 10px 14px', borderRadius: 14,
+            background: 'rgba(255,255,255,0.96)', border: '1px solid #e6eefb',
+            boxShadow: '0 6px 24px rgba(0,0,0,0.14)', backdropFilter: 'blur(10px)',
+            display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <button
+              onClick={() => { if (rlot) { selectLot(route.lotId); setView('mapa'); } }}
+              style={{
+                flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, padding: 0,
+              }}>
+              <span style={{ fontSize: 18 }}>🚗</span>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700, color: '#1d4ed8' }}>
+                  {fmtEta(route.durationS)} · {fmtDist(route.distanceM)}
+                </span>
+                <span style={{ display: 'block', fontSize: 11, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  Ruta hasta {rlot ? rlot.name : 'el parqueo'}
+                </span>
+              </span>
+            </button>
+            <button
+              onClick={clearRoute}
+              aria-label="Cerrar ruta"
+              style={{
+                flexShrink: 0, width: 34, height: 34, borderRadius: '50%',
+                border: '1px solid #e6eefb', background: '#f4f8ff', color: '#1d4ed8',
+                fontSize: 18, lineHeight: 1, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>×</button>
+          </div>
+        );
+      })()}
 
       {/* ── Detail bottom sheet ── */}
       {selected && (
