@@ -101,11 +101,11 @@
     .btn-outline:hover { border-color:var(--verde); }
     /* Nav */
     .nav { position:sticky; top:0; z-index:50; background:rgba(244,247,242,.85); backdrop-filter:saturate(180%) blur(12px); border-bottom:1px solid var(--border); }
-    .nav .row { display:flex; align-items:center; justify-content:space-between; height:64px; }
-    .nav img { height:28px; width:auto; }
+    .nav .row { display:flex; align-items:center; justify-content:space-between; height:72px; }
+    .nav img { height:42px; width:auto; }
     .nav .links { display:flex; align-items:center; gap:26px; }
-    .nav .links a { font-size:14px; color:var(--ink); font-weight:500; }
-    .nav .links a:hover { color:var(--verde); }
+    .nav .links a:not(.btn) { font-size:14.5px; color:var(--ink); font-weight:500; }
+    .nav .links a:not(.btn):hover { color:var(--verde); }
     .nav .cta-sm { font-size:14px; padding:9px 16px; }
     @media (max-width:760px){ .nav .links a.hide-sm { display:none; } }
     /* Hero */
@@ -166,7 +166,7 @@
     .faq summary::after { content:'+'; color:var(--muted); font-weight:400; font-size:22px; line-height:1; }
     .faq details[open] summary::after { content:'–'; }
     .faq p { font-size:15px; line-height:1.6; color:var(--ink); margin:12px 0 2px; }
-    .cta-band { background:linear-gradient(120% 120% at 20% 0%, #0A4433, #052E22); color:#fff; border-radius:26px; padding:50px 40px; text-align:center; }
+    .cta-band { background:linear-gradient(135deg, #0A4433, #052E22); color:#fff; border-radius:26px; padding:50px 40px; text-align:center; }
     .cta-band h2 { font-size:30px; margin:0 0 10px; }
     .cta-band p { color:rgba(255,255,255,.8); font-size:16px; margin:0 0 26px; }
     footer.site { border-top:1px solid var(--border); padding:40px 0 60px; margin-top:20px; }

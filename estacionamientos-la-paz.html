@@ -53,49 +53,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geomini:wght@400;500;700&family=Open+Sans:wght@400;600;700&display=swap">
-  <style>
-    :root { --verde:#052E22; --verde2:#0A4433; --lima:#A3E635; --avail:#27AE60; --full:#E74C3C; --bg:#F4F7F2; --surface:#fff; --muted:#5B6B62; --border:#E2E8DE; --ink:#213b31; --sans:'Geomini',system-ui,sans-serif; --mono:'Open Sans',system-ui,sans-serif; }
-    * { box-sizing:border-box; }
-    html { scroll-behavior:smooth; }
-    html,body { margin:0; padding:0; background:var(--bg); color:var(--verde); font-family:var(--sans); -webkit-font-smoothing:antialiased; -webkit-text-size-adjust:100%; overflow-x:hidden; }
-    img { max-width:100%; display:block; }
-    a { color:inherit; text-decoration:none; }
-    .wrap { max-width:820px; margin:0 auto; padding:0 22px; }
-    .btn { display:inline-flex; align-items:center; gap:8px; font-weight:700; font-size:15px; padding:13px 22px; border-radius:14px; border:1.5px solid transparent; }
-    .btn-lima { background:var(--lima); color:var(--verde); box-shadow:0 6px 20px rgba(163,230,53,.35); }
-    .btn-dark { background:var(--verde); color:#fff; }
-    .nav { position:sticky; top:0; z-index:50; background:rgba(244,247,242,.85); backdrop-filter:saturate(180%) blur(12px); border-bottom:1px solid var(--border); }
-    .nav .row { display:flex; align-items:center; justify-content:space-between; height:64px; max-width:820px; margin:0 auto; padding:0 22px; }
-    .nav img { height:28px; width:auto; }
-    .nav .links { display:flex; align-items:center; gap:22px; }
-    .nav .links a { font-size:14px; color:var(--ink); font-weight:500; }
-    .nav .cta-sm { font-size:14px; padding:9px 16px; }
-    @media (max-width:640px){ .nav .links a.hide-sm { display:none; } }
-    .breadcrumb { font-family:var(--mono); font-size:12.5px; color:var(--muted); padding:18px 0 0; }
-    .breadcrumb a { color:var(--muted); }
-    .hero { padding:26px 0 8px; }
-    h1 { font-size:34px; line-height:1.12; margin:8px 0 14px; letter-spacing:-.01em; }
-    h2 { font-size:22px; margin:36px 0 10px; }
-    p, li { font-size:16px; line-height:1.7; color:var(--ink); }
-    .muted { color:var(--muted); }
-    .legend { display:flex; gap:18px; flex-wrap:wrap; margin:16px 0; font-family:var(--mono); font-size:14px; }
-    .dot { display:inline-block; width:12px; height:12px; border-radius:50%; margin-right:7px; vertical-align:middle; }
-    .zones { display:flex; flex-wrap:wrap; gap:9px; padding:0; list-style:none; margin:14px 0; }
-    .zones li { background:var(--surface); border:1px solid var(--border); border-radius:999px; padding:7px 15px; font-family:var(--mono); font-size:13px; }
-    .zones li a { color:var(--verde); font-weight:600; }
-    .card { background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:26px; margin:26px 0; }
-    details { border-top:1px solid var(--border); padding:15px 0; }
-    details:last-of-type { border-bottom:1px solid var(--border); }
-    summary { font-weight:600; cursor:pointer; font-size:16px; list-style:none; display:flex; justify-content:space-between; gap:14px; }
-    summary::-webkit-details-marker { display:none; }
-    summary::after { content:'+'; color:var(--muted); font-size:20px; }
-    details[open] summary::after { content:'–'; }
-    details p { margin:12px 0 0; }
-    .center { text-align:center; margin:32px 0; }
-    footer.site { border-top:1px solid var(--border); margin-top:44px; padding:30px 0 56px; }
-    footer.site a { color:var(--ink); }
-    footer .fl { display:flex; flex-wrap:wrap; gap:18px; font-family:var(--mono); font-size:14px; margin-top:12px; }
-  </style>
+  <link rel="stylesheet" href="/assets/pages.css">
 </head>
 <body>
   <header class="nav">
@@ -104,76 +62,74 @@
       <nav class="links">
         <a class="hide-sm" href="/">Inicio</a>
         <a class="hide-sm" href="/parqueos-la-paz">Parqueos</a>
-        <a class="btn btn-dark cta-sm" href="/app">Abrir el mapa</a>
+        <a class="btn btn-dark" href="/app">Abrir el mapa</a>
       </nav>
     </div>
   </header>
 
   <main class="wrap">
     <p class="breadcrumb"><a href="/">Inicio</a> › Estacionamientos en La Paz</p>
+
     <section class="hero">
-      <h1>Estacionamientos en La Paz: disponibilidad en vivo</h1>
-      <p>Encontrar un <strong>estacionamiento</strong> con espacio en La Paz no debería ser una lotería. <strong>Llamita</strong> reúne los estacionamientos de La Paz y El Alto en un solo <strong>mapa en tiempo real</strong> donde ves cuáles tienen cupos libres <em>ahora</em> — y, cuando el operador lo publica, también su tarifa por hora.</p>
+      <h1>Estacionamientos en La Paz, en vivo</h1>
+      <p class="lead">Ve qué estacionamientos de La Paz y El Alto tienen espacio libre <em>ahora</em> — y, cuando el operador lo publica, también su tarifa por hora.</p>
       <div class="legend">
         <span><span class="dot" style="background:var(--avail)"></span>Con espacio libre</span>
         <span><span class="dot" style="background:var(--full)"></span>Lleno</span>
       </div>
-      <p class="center"><a class="btn btn-lima" href="/app">Ver estacionamientos disponibles →</a></p>
+      <p><a class="btn btn-lima" href="/app">Ver estacionamientos disponibles →</a></p>
     </section>
 
-    <h2>Disponibilidad y tarifas, antes de salir de casa</h2>
-    <p>Cada estacionamiento en Llamita lo gestiona su propio operador, que marca en vivo cuándo se llena o se libera. Así evitas llegar a una playa de estacionamiento completa y puedes comparar opciones cercanas por espacio y por precio antes de manejar hasta allá.</p>
+    <h2>Tipos de estacionamiento</h2>
+    <div class="grid2">
+      <div class="infocard"><h3>Playa (superficie)</h3><p>Al aire libre, comunes cerca de mercados y avenidas comerciales. Cobran por hora o fracción.</p></div>
+      <div class="infocard"><h3>Edificio (en altura)</h3><p>Varios niveles techados, frecuentes en el Centro y zonas de oficinas. Protegen del clima.</p></div>
+      <div class="infocard"><h3>Privado por horas</h3><p>Lotes gestionados por su dueño, que publican su disponibilidad y tarifa en Llamita.</p></div>
+      <div class="infocard"><h3>Tarifa visible</h3><p>Compara el precio de opciones cercanas antes de manejar hasta allá.</p></div>
+    </div>
 
-    <h2>Estacionamientos por zona</h2>
-    <p>La cobertura crece con cada operador que se suma. Busca estacionamientos en zonas como:</p>
-    <ul class="zones">
-      <li>Centro</li><li>San Pedro</li><li>Sopocachi</li><li>Miraflores</li>
-      <li>San Miguel</li><li>Calacoto</li><li>Obrajes</li><li>Zona Sur</li>
-      <li>Cota Cota</li><li>El Alto</li>
-    </ul>
-    <p>Guías por zona:</p>
+    <h2>Qué mirar antes de elegir</h2>
+    <div class="grid2">
+      <div class="infocard"><h3>Disponibilidad real</h3><p>Que muestre cupos libres ahora, no un dato de hace horas.</p></div>
+      <div class="infocard"><h3>Tarifa por hora</h3><p>Compara precios cercanos antes de llegar.</p></div>
+      <div class="infocard"><h3>Cobertura y seguridad</h3><p>Si es techado y qué medidas publica el operador.</p></div>
+      <div class="infocard"><h3>Ubicación</h3><p>A veces una cuadra más allá ahorra tiempo y sale más barato.</p></div>
+    </div>
+
+    <h2>Busca por zona</h2>
     <ul class="zones">
       <li><a href="/parqueos-sopocachi">Sopocachi</a></li>
       <li><a href="/parqueos-centro-la-paz">Centro</a></li>
       <li><a href="/parqueos-obrajes">Obrajes</a></li>
     </ul>
 
-    <h2>Tipos de estacionamiento en La Paz</h2>
-    <ul>
-      <li><strong>Playas de estacionamiento (superficie).</strong> Espacios al aire libre, comunes cerca de mercados y avenidas comerciales; suelen cobrar por hora o fracción.</li>
-      <li><strong>Edificios de estacionamiento (en altura).</strong> Varios niveles techados, frecuentes en el Centro y zonas de oficinas; protegen tu vehículo del clima.</li>
-      <li><strong>Estacionamientos privados por horas.</strong> Lotes gestionados por su dueño que publican su disponibilidad y tarifa en Llamita.</li>
-    </ul>
-
     <div class="card">
-      <h2 style="margin-top:0">Operadores de estacionamientos</h2>
-      <p>Si administras una playa o edificio de estacionamiento en La Paz, con Llamita publicas tu disponibilidad en tiempo real, defines tus tarifas, registras ingresos y salidas de vehículos y descargas tu registro de ventas — atrayendo a conductores que buscan espacio justo cuando lo tienes.</p>
-      <p class="center" style="margin-bottom:0"><a class="btn btn-dark" href="/app">Publicar mi estacionamiento →</a></p>
+      <h2 style="margin-top:0">¿Administras un estacionamiento?</h2>
+      <p>Con Llamita publicas tu disponibilidad en tiempo real, defines tus tarifas, registras ingresos y salidas y descargas tu registro de ventas — atrayendo conductores justo cuando tienes espacio.</p>
+      <p style="margin-bottom:0"><a class="btn btn-dark" href="/app">Publicar mi estacionamiento →</a></p>
     </div>
 
-    <h2>Qué mirar antes de elegir un estacionamiento</h2>
-    <ul>
-      <li><strong>Disponibilidad real.</strong> Que muestre cupos libres ahora, no un dato de hace horas.</li>
-      <li><strong>Tarifa por hora.</strong> Compara el precio de opciones cercanas antes de llegar.</li>
-      <li><strong>Cobertura y seguridad.</strong> Si es techado y qué medidas de seguridad publica el operador.</li>
-      <li><strong>Ubicación.</strong> A veces conviene una cuadra más allá si ahorra tiempo y sale más barato.</li>
-    </ul>
-
     <h2>Preguntas frecuentes</h2>
-    <details open>
-      <summary>¿Cómo veo qué estacionamientos tienen espacio libre en La Paz?</summary>
-      <p>Llamita muestra un mapa en vivo de los estacionamientos de La Paz y El Alto. Cada operador actualiza su disponibilidad en tiempo real, así que ves de inmediato cuáles tienen cupos y cuáles están llenos.</p>
-    </details>
-    <details>
-      <summary>¿Puedo ver las tarifas antes de llegar?</summary>
-      <p>Sí. Muchos estacionamientos publican su tarifa por hora en Llamita, para que sepas cuánto pagarás antes de manejar hasta allá.</p>
-    </details>
-    <details>
-      <summary>¿Tiene costo para el conductor?</summary>
-      <p>No. Buscar estacionamiento en Llamita es gratis para los conductores. Solo los operadores usan la plataforma para gestionar sus estacionamientos.</p>
-    </details>
+    <div class="faq">
+      <details open>
+        <summary>¿Cómo veo qué estacionamientos tienen espacio libre?</summary>
+        <p>Llamita muestra un mapa en vivo de La Paz y El Alto. Cada operador actualiza su disponibilidad en tiempo real, así que ves de inmediato cuáles tienen cupos.</p>
+      </details>
+      <details>
+        <summary>¿Puedo ver las tarifas antes de llegar?</summary>
+        <p>Sí. Muchos estacionamientos publican su tarifa por hora en Llamita.</p>
+      </details>
+      <details>
+        <summary>¿Tiene costo para el conductor?</summary>
+        <p>No. Buscar estacionamiento en Llamita es gratis para los conductores.</p>
+      </details>
+    </div>
 
-    <p class="center" style="margin:38px 0"><a class="btn btn-lima" href="/app">Abrir el mapa de estacionamientos de La Paz →</a></p>
+    <div class="cta-band">
+      <h2>Encuentra estacionamiento sin dar vueltas</h2>
+      <p>Abre el mapa en vivo de La Paz y El Alto.</p>
+      <a class="btn btn-lima" href="/app">Ver estacionamientos →</a>
+    </div>
   </main>
 
   <footer class="site">

@@ -54,49 +54,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geomini:wght@400;500;700&family=Open+Sans:wght@400;600;700&display=swap">
-  <style>
-    :root { --verde:#052E22; --verde2:#0A4433; --lima:#A3E635; --avail:#27AE60; --full:#E74C3C; --bg:#F4F7F2; --surface:#fff; --muted:#5B6B62; --border:#E2E8DE; --ink:#213b31; --sans:'Geomini',system-ui,sans-serif; --mono:'Open Sans',system-ui,sans-serif; }
-    * { box-sizing:border-box; }
-    html { scroll-behavior:smooth; }
-    html,body { margin:0; padding:0; background:var(--bg); color:var(--verde); font-family:var(--sans); -webkit-font-smoothing:antialiased; -webkit-text-size-adjust:100%; overflow-x:hidden; }
-    img { max-width:100%; display:block; }
-    a { color:inherit; text-decoration:none; }
-    .wrap { max-width:820px; margin:0 auto; padding:0 22px; }
-    .btn { display:inline-flex; align-items:center; gap:8px; font-weight:700; font-size:15px; padding:13px 22px; border-radius:14px; border:1.5px solid transparent; }
-    .btn-lima { background:var(--lima); color:var(--verde); box-shadow:0 6px 20px rgba(163,230,53,.35); }
-    .btn-dark { background:var(--verde); color:#fff; }
-    .nav { position:sticky; top:0; z-index:50; background:rgba(244,247,242,.85); backdrop-filter:saturate(180%) blur(12px); border-bottom:1px solid var(--border); }
-    .nav .row { display:flex; align-items:center; justify-content:space-between; height:64px; max-width:820px; margin:0 auto; padding:0 22px; }
-    .nav img { height:28px; width:auto; }
-    .nav .links { display:flex; align-items:center; gap:22px; }
-    .nav .links a { font-size:14px; color:var(--ink); font-weight:500; }
-    .nav .cta-sm { font-size:14px; padding:9px 16px; }
-    @media (max-width:640px){ .nav .links a.hide-sm { display:none; } }
-    .breadcrumb { font-family:var(--mono); font-size:12.5px; color:var(--muted); padding:18px 0 0; }
-    .breadcrumb a { color:var(--muted); }
-    .hero { padding:26px 0 8px; }
-    h1 { font-size:33px; line-height:1.12; margin:8px 0 14px; letter-spacing:-.01em; }
-    h2 { font-size:22px; margin:36px 0 10px; }
-    p, li { font-size:16px; line-height:1.7; color:var(--ink); }
-    .muted { color:var(--muted); }
-    .legend { display:flex; gap:18px; flex-wrap:wrap; margin:16px 0; font-family:var(--mono); font-size:14px; }
-    .dot { display:inline-block; width:12px; height:12px; border-radius:50%; margin-right:7px; vertical-align:middle; }
-    .zones { display:flex; flex-wrap:wrap; gap:9px; padding:0; list-style:none; margin:14px 0; }
-    .zones li { background:var(--surface); border:1px solid var(--border); border-radius:999px; padding:7px 15px; font-family:var(--mono); font-size:13px; }
-    .zones li a { color:var(--verde); font-weight:600; }
-    .card { background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:26px; margin:26px 0; }
-    details { border-top:1px solid var(--border); padding:15px 0; }
-    details:last-of-type { border-bottom:1px solid var(--border); }
-    summary { font-weight:600; cursor:pointer; font-size:16px; list-style:none; display:flex; justify-content:space-between; gap:14px; }
-    summary::-webkit-details-marker { display:none; }
-    summary::after { content:'+'; color:var(--muted); font-size:20px; }
-    details[open] summary::after { content:'–'; }
-    details p { margin:12px 0 0; }
-    .center { text-align:center; margin:32px 0; }
-    footer.site { border-top:1px solid var(--border); margin-top:44px; padding:30px 0 56px; }
-    footer.site a { color:var(--ink); }
-    footer .fl { display:flex; flex-wrap:wrap; gap:18px; font-family:var(--mono); font-size:14px; margin-top:12px; }
-  </style>
+  <link rel="stylesheet" href="/assets/pages.css">
 </head>
 <body>
   <header class="nav">
@@ -105,61 +63,66 @@
       <nav class="links">
         <a class="hide-sm" href="/">Inicio</a>
         <a class="hide-sm" href="/parqueos-la-paz">Parqueos en La Paz</a>
-        <a class="btn btn-dark cta-sm" href="/app">Abrir el mapa</a>
+        <a class="btn btn-dark" href="/app">Abrir el mapa</a>
       </nav>
     </div>
   </header>
 
   <main class="wrap">
     <p class="breadcrumb"><a href="/">Inicio</a> › <a href="/parqueos-la-paz">Parqueos en La Paz</a> › Obrajes</p>
+
     <section class="hero">
-      <h1>Parqueos en Obrajes: disponibilidad en vivo camino a la Zona Sur</h1>
-      <p>Obrajes es una zona residencial y de paso hacia la <strong>Zona Sur</strong>, organizada en calles numeradas a lo largo de su avenida principal, con clínicas, colegios y comercio. Encontrar parqueo cerca de una clínica o del comercio de la avenida puede complicarse en horas de consulta y de entrada y salida de colegios. <strong>Llamita</strong> te muestra los parqueos de Obrajes con espacio libre <em>ahora</em>.</p>
+      <h1>Parqueos en Obrajes, en tiempo real</h1>
+      <p class="lead">Obrajes es zona residencial y de paso hacia la <strong>Zona Sur</strong>, con clínicas, colegios y comercio sobre su avenida principal. Llamita te muestra qué parqueos tienen espacio libre <em>ahora</em>.</p>
       <div class="legend">
         <span><span class="dot" style="background:var(--avail)"></span>Hay espacio libre</span>
         <span><span class="dot" style="background:var(--full)"></span>Lleno</span>
       </div>
-      <p class="center"><a class="btn btn-lima" href="/app">Ver parqueos en Obrajes →</a></p>
+      <p><a class="btn btn-lima" href="/app">Ver parqueos en Obrajes →</a></p>
     </section>
 
-    <h2>Cómo es estacionar en Obrajes</h2>
-    <p>Al ser un punto de paso entre el centro y la Zona Sur, Obrajes tiene un flujo constante de vehículos sobre su avenida principal. El parqueo en superficie cerca de las clínicas, los colegios y el comercio de las calles numeradas se ocupa rápido en ciertos horarios. Con Llamita evitas dar vueltas: ves qué parqueo cercano tiene cupos y vas directo.</p>
-
     <h2>Cuándo cuesta más encontrar espacio</h2>
-    <ul>
-      <li><strong>Horas de consulta médica:</strong> alta demanda alrededor de clínicas y consultorios.</li>
-      <li><strong>Entrada y salida de colegios:</strong> picos por la mañana y al mediodía.</li>
-      <li><strong>Hora punta de tránsito:</strong> como zona de paso a la Zona Sur, la avenida principal se congestiona en las horas pico.</li>
-    </ul>
+    <div class="grid2">
+      <div class="infocard"><h3>Horas de consulta médica</h3><p>Alta demanda alrededor de clínicas y consultorios.</p></div>
+      <div class="infocard"><h3>Entrada y salida de colegios</h3><p>Picos por la mañana y al mediodía.</p></div>
+      <div class="infocard"><h3>Hora punta de tránsito</h3><p>Como paso a la Zona Sur, la avenida principal se congestiona.</p></div>
+      <div class="infocard"><h3>Comercio de la avenida</h3><p>El parqueo en superficie se ocupa rápido en ciertos tramos.</p></div>
+    </div>
 
     <div class="card">
       <h2 style="margin-top:0">¿Tienes un parqueo en Obrajes?</h2>
-      <p>Publícalo en Llamita para que los conductores que pasan por Obrajes o van a una clínica de la zona vean cuándo tienes espacio libre. Muestras tu disponibilidad y tarifa en tiempo real y llevas el registro de ingresos y salidas desde tu celular.</p>
-      <p class="center" style="margin-bottom:0"><a class="btn btn-dark" href="/app">Publicar mi parqueo →</a></p>
+      <p>Publícalo en Llamita para que los conductores que pasan por Obrajes o van a una clínica de la zona vean cuándo tienes espacio libre. Muestras tu disponibilidad y tarifa en vivo desde el celular.</p>
+      <p style="margin-bottom:0"><a class="btn btn-dark" href="/app">Publicar mi parqueo →</a></p>
     </div>
 
     <h2>Preguntas frecuentes</h2>
-    <details open>
-      <summary>¿Hay parqueo cerca de las clínicas de Obrajes?</summary>
-      <p>En Llamita ves en un mapa en vivo los parqueos de Obrajes con espacio libre ahora, incluidos los cercanos a clínicas y consultorios de la zona.</p>
-    </details>
-    <details>
-      <summary>¿Dónde estacionar en la avenida principal de Obrajes?</summary>
-      <p>El comercio de la avenida principal y las calles numeradas de Obrajes se llenan en horas de consulta y de entrada y salida de colegios. Con Llamita ves qué parqueos cercanos tienen cupos antes de llegar.</p>
-    </details>
-    <details>
-      <summary>¿Obrajes está en la Zona Sur?</summary>
-      <p>Obrajes está entre el centro de la ciudad y la Zona Sur, sobre la ruta hacia el sur, por lo que es un punto de paso muy transitado. En Llamita también ves parqueos en las zonas vecinas.</p>
-    </details>
+    <div class="faq">
+      <details open>
+        <summary>¿Hay parqueo cerca de las clínicas de Obrajes?</summary>
+        <p>En Llamita ves en un mapa en vivo los parqueos de Obrajes con espacio libre ahora, incluidos los cercanos a clínicas y consultorios.</p>
+      </details>
+      <details>
+        <summary>¿Dónde estacionar en la avenida principal de Obrajes?</summary>
+        <p>El comercio de la avenida y las calles numeradas se llenan en horas de consulta y de colegios. Con Llamita ves qué parqueos cercanos tienen cupos antes de llegar.</p>
+      </details>
+      <details>
+        <summary>¿Obrajes está en la Zona Sur?</summary>
+        <p>Obrajes está entre el centro y la Zona Sur, sobre la ruta hacia el sur, por lo que es un punto de paso muy transitado.</p>
+      </details>
+    </div>
 
-    <h2>Parqueos en otras zonas de La Paz</h2>
+    <h2>Otras zonas</h2>
     <ul class="zones">
-      <li><a href="/parqueos-sopocachi">Parqueos en Sopocachi</a></li>
-      <li><a href="/parqueos-centro-la-paz">Parqueos en el Centro</a></li>
+      <li><a href="/parqueos-sopocachi">Sopocachi</a></li>
+      <li><a href="/parqueos-centro-la-paz">Centro</a></li>
       <li><a href="/parqueos-la-paz">Toda La Paz</a></li>
     </ul>
 
-    <p class="center" style="margin:38px 0"><a class="btn btn-lima" href="/app">Abrir el mapa de parqueos de Obrajes →</a></p>
+    <div class="cta-band">
+      <h2>Estaciona en Obrajes sin dar vueltas</h2>
+      <p>Abre el mapa en vivo y ve directo al cupo libre.</p>
+      <a class="btn btn-lima" href="/app">Ver parqueos en Obrajes →</a>
+    </div>
   </main>
 
   <footer class="site">

@@ -53,49 +53,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geomini:wght@400;500;700&family=Open+Sans:wght@400;600;700&display=swap">
-  <style>
-    :root { --verde:#052E22; --verde2:#0A4433; --lima:#A3E635; --avail:#27AE60; --full:#E74C3C; --bg:#F4F7F2; --surface:#fff; --muted:#5B6B62; --border:#E2E8DE; --ink:#213b31; --sans:'Geomini',system-ui,sans-serif; --mono:'Open Sans',system-ui,sans-serif; }
-    * { box-sizing:border-box; }
-    html { scroll-behavior:smooth; }
-    html,body { margin:0; padding:0; background:var(--bg); color:var(--verde); font-family:var(--sans); -webkit-font-smoothing:antialiased; -webkit-text-size-adjust:100%; overflow-x:hidden; }
-    img { max-width:100%; display:block; }
-    a { color:inherit; text-decoration:none; }
-    .wrap { max-width:820px; margin:0 auto; padding:0 22px; }
-    .btn { display:inline-flex; align-items:center; gap:8px; font-weight:700; font-size:15px; padding:13px 22px; border-radius:14px; border:1.5px solid transparent; }
-    .btn-lima { background:var(--lima); color:var(--verde); box-shadow:0 6px 20px rgba(163,230,53,.35); }
-    .btn-dark { background:var(--verde); color:#fff; }
-    .nav { position:sticky; top:0; z-index:50; background:rgba(244,247,242,.85); backdrop-filter:saturate(180%) blur(12px); border-bottom:1px solid var(--border); }
-    .nav .row { display:flex; align-items:center; justify-content:space-between; height:64px; max-width:820px; margin:0 auto; padding:0 22px; }
-    .nav img { height:28px; width:auto; }
-    .nav .links { display:flex; align-items:center; gap:22px; }
-    .nav .links a { font-size:14px; color:var(--ink); font-weight:500; }
-    .nav .cta-sm { font-size:14px; padding:9px 16px; }
-    @media (max-width:640px){ .nav .links a.hide-sm { display:none; } }
-    .breadcrumb { font-family:var(--mono); font-size:12.5px; color:var(--muted); padding:18px 0 0; }
-    .breadcrumb a { color:var(--muted); }
-    .hero { padding:26px 0 8px; }
-    h1 { font-size:34px; line-height:1.12; margin:8px 0 14px; letter-spacing:-.01em; }
-    h2 { font-size:22px; margin:36px 0 10px; }
-    p, li { font-size:16px; line-height:1.7; color:var(--ink); }
-    .muted { color:var(--muted); }
-    .legend { display:flex; gap:18px; flex-wrap:wrap; margin:16px 0; font-family:var(--mono); font-size:14px; }
-    .dot { display:inline-block; width:12px; height:12px; border-radius:50%; margin-right:7px; vertical-align:middle; }
-    .zones { display:flex; flex-wrap:wrap; gap:9px; padding:0; list-style:none; margin:14px 0; }
-    .zones li { background:var(--surface); border:1px solid var(--border); border-radius:999px; padding:7px 15px; font-family:var(--mono); font-size:13px; }
-    .zones li a { color:var(--verde); font-weight:600; }
-    .card { background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:26px; margin:26px 0; }
-    details { border-top:1px solid var(--border); padding:15px 0; }
-    details:last-of-type { border-bottom:1px solid var(--border); }
-    summary { font-weight:600; cursor:pointer; font-size:16px; list-style:none; display:flex; justify-content:space-between; gap:14px; }
-    summary::-webkit-details-marker { display:none; }
-    summary::after { content:'+'; color:var(--muted); font-size:20px; }
-    details[open] summary::after { content:'–'; }
-    details p { margin:12px 0 0; }
-    .center { text-align:center; margin:32px 0; }
-    footer.site { border-top:1px solid var(--border); margin-top:44px; padding:30px 0 56px; }
-    footer.site a { color:var(--ink); }
-    footer .fl { display:flex; flex-wrap:wrap; gap:18px; font-family:var(--mono); font-size:14px; margin-top:12px; }
-  </style>
+  <link rel="stylesheet" href="/assets/pages.css">
 </head>
 <body>
   <header class="nav">
@@ -104,81 +62,75 @@
       <nav class="links">
         <a class="hide-sm" href="/">Inicio</a>
         <a class="hide-sm" href="/estacionamientos-la-paz">Estacionamientos</a>
-        <a class="btn btn-dark cta-sm" href="/app">Abrir el mapa</a>
+        <a class="btn btn-dark" href="/app">Abrir el mapa</a>
       </nav>
     </div>
   </header>
 
   <main class="wrap">
     <p class="breadcrumb"><a href="/">Inicio</a> › Parqueos en La Paz</p>
+
     <section class="hero">
-      <h1>Parqueos en La Paz: encuentra espacio libre en tiempo real</h1>
-      <p>Dar vueltas buscando dónde estacionar en La Paz cuesta tiempo, gasolina y paciencia. <strong>Llamita</strong> resuelve eso con un <strong>mapa en vivo de parqueos</strong>: ves de un vistazo qué parqueos tienen cupos disponibles <em>ahora mismo</em> en La Paz y El Alto, sin llamar ni adivinar.</p>
+      <h1>Parqueos en La Paz, en tiempo real</h1>
+      <p class="lead">Deja de dar vueltas. Llamita te muestra en un mapa en vivo qué parqueos tienen espacio libre <em>ahora</em> en La Paz y El Alto.</p>
       <div class="legend">
         <span><span class="dot" style="background:var(--avail)"></span>Hay espacio libre</span>
-        <span><span class="dot" style="background:var(--full)"></span>Parqueo lleno</span>
+        <span><span class="dot" style="background:var(--full)"></span>Lleno</span>
       </div>
-      <p class="center"><a class="btn btn-lima" href="/app">Ver parqueos disponibles ahora →</a></p>
+      <p><a class="btn btn-lima" href="/app">Ver parqueos disponibles ahora →</a></p>
     </section>
 
     <h2>Cómo funciona</h2>
-    <p>Los operadores de cada parqueo actualizan su disponibilidad en tiempo real desde Llamita. Cuando entra o sale un vehículo, el mapa cambia al instante, así que lo que ves refleja el estado real del estacionamiento, no un dato de hace horas.</p>
-    <ol>
-      <li><strong>Abre el mapa</strong> en tu celular o computadora — no necesitas instalar nada.</li>
-      <li><strong>Mira los parqueos cercanos</strong>: en verde los que tienen cupos, en rojo los llenos.</li>
-      <li><strong>Ve directo</strong> al parqueo con espacio y ahorra el recorrido de búsqueda.</li>
-    </ol>
+    <div class="grid2">
+      <div class="infocard"><h3>1 · Abre el mapa</h3><p>Desde el celular o la computadora. Sin instalar nada.</p></div>
+      <div class="infocard"><h3>2 · Mira los cupos</h3><p>Verde = hay espacio. Rojo = lleno. Actualizado en vivo por el operador.</p></div>
+      <div class="infocard"><h3>3 · Ve directo</h3><p>Eliges el parqueo con espacio y llegas sin buscar.</p></div>
+      <div class="infocard"><h3>En tiempo real</h3><p>Lo que ves es el estado actual del parqueo, no un dato de hace horas.</p></div>
+    </div>
 
-    <h2>Zonas de La Paz y El Alto que cubrimos</h2>
-    <p>Llamita crece a medida que más parqueos se suman. Entre las zonas donde encontrarás parqueos y estacionamientos referenciados están:</p>
+    <h2>Busca por zona</h2>
+    <p>Cada zona tiene sus horas complicadas. Entra a la guía de la tuya:</p>
     <ul class="zones">
-      <li>Centro</li><li>San Pedro</li><li>Sopocachi</li><li>Miraflores</li>
-      <li>San Miguel</li><li>Calacoto</li><li>Obrajes</li><li>Zona Sur</li>
-      <li>Cota Cota</li><li>El Alto</li>
+      <li><a href="/parqueos-sopocachi">Sopocachi</a></li>
+      <li><a href="/parqueos-centro-la-paz">Centro</a></li>
+      <li><a href="/parqueos-obrajes">Obrajes</a></li>
     </ul>
 
-    <h2>Parqueos por zona en La Paz</h2>
-    <p>Cada zona tiene su propio ritmo de parqueo y sus horas complicadas. Entra a la guía de tu zona para encontrar espacio más rápido:</p>
-    <ul class="zones">
-      <li><a href="/parqueos-sopocachi">Parqueos en Sopocachi</a></li>
-      <li><a href="/parqueos-centro-la-paz">Parqueos en el Centro</a></li>
-      <li><a href="/parqueos-obrajes">Parqueos en Obrajes</a></li>
-    </ul>
-
-    <h2>Cómo estacionar en La Paz sin dar vueltas</h2>
-    <p>La Paz es una ciudad empinada y densa, y estacionar en superficie puede ser complicado según la zona y la hora. Algunas ideas que ayudan:</p>
-    <ul>
-      <li><strong>Evita las horas pico.</strong> Entre las 8:00 y 9:30 y entre las 18:00 y 20:00 la demanda de parqueo se dispara, sobre todo en el Centro y Sopocachi.</li>
-      <li><strong>Ten en cuenta la restricción vehicular.</strong> En algunas jornadas circulan menos vehículos; revisa siempre las disposiciones municipales vigentes antes de salir.</li>
-      <li><strong>Prefiere un parqueo con espacio confirmado.</strong> En lugar de dar vueltas, abre Llamita y ve directo a un parqueo que muestre cupos disponibles en verde.</li>
-      <li><strong>Compara zonas cercanas.</strong> A veces una o dos cuadras cambian por completo la disponibilidad; el mapa te deja ver alternativas al instante.</li>
-    </ul>
+    <h2>Tips para estacionar en La Paz</h2>
+    <div class="grid2">
+      <div class="infocard"><h3>Evita las horas pico</h3><p>8:00–9:30 y 18:00–20:00 son las más difíciles, sobre todo en el Centro y Sopocachi.</p></div>
+      <div class="infocard"><h3>Ve a un cupo confirmado</h3><p>En vez de dar vueltas, abre el mapa y ve directo a un parqueo en verde.</p></div>
+      <div class="infocard"><h3>Compara zonas cercanas</h3><p>Una o dos cuadras cambian por completo la disponibilidad.</p></div>
+      <div class="infocard"><h3>Revisa la restricción vehicular</h3><p>Consulta siempre las disposiciones municipales vigentes antes de salir.</p></div>
+    </div>
 
     <div class="card">
-      <h2 style="margin-top:0">¿Tienes un parqueo o playa de estacionamiento?</h2>
-      <p>Publica tu parqueo en Llamita para que miles de conductores en La Paz vean cuándo tienes espacio libre. Registras tu ubicación, muestras tu disponibilidad en tiempo real y llevas el registro de ingresos y salidas — todo desde tu celular.</p>
-      <p class="center" style="margin-bottom:0"><a class="btn btn-dark" href="/app">Registrar mi parqueo →</a></p>
+      <h2 style="margin-top:0">¿Tienes un parqueo?</h2>
+      <p>Publícalo en Llamita para que los conductores vean cuándo tienes espacio libre. Muestras tu disponibilidad y tarifa en vivo y llevas tu registro de ventas, todo desde el celular.</p>
+      <p style="margin-bottom:0"><a class="btn btn-dark" href="/app">Publicar mi parqueo →</a></p>
     </div>
 
     <h2>Preguntas frecuentes</h2>
-    <details open>
-      <summary>¿Dónde puedo encontrar parqueo en La Paz ahora mismo?</summary>
-      <p>En Llamita ves un mapa en vivo que muestra qué parqueos tienen espacio libre en este momento en La Paz y El Alto. Los parqueos en verde tienen cupos disponibles y los rojos están llenos.</p>
-    </details>
-    <details>
-      <summary>¿Cuánto cuesta usar Llamita?</summary>
-      <p>Para los conductores es totalmente gratis. Solo abres el mapa y ves la disponibilidad de parqueos en tiempo real, sin registrarte.</p>
-    </details>
-    <details>
-      <summary>¿Cubren la Zona Sur y El Alto?</summary>
-      <p>Sí. Llamita cubre La Paz y El Alto — incluyendo Centro, Sopocachi, Miraflores, San Miguel, Calacoto y toda la Zona Sur — y suma más parqueos constantemente.</p>
-    </details>
-    <details>
-      <summary>¿Necesito instalar una aplicación?</summary>
-      <p>No. Llamita funciona directo en el navegador de tu celular o computadora. También puedes agregarla a tu pantalla de inicio para abrirla como una app.</p>
-    </details>
+    <div class="faq">
+      <details open>
+        <summary>¿Dónde encuentro parqueo en La Paz ahora mismo?</summary>
+        <p>En Llamita ves un mapa en vivo que muestra qué parqueos tienen espacio libre en este momento en La Paz y El Alto. Verde = cupos disponibles, rojo = lleno.</p>
+      </details>
+      <details>
+        <summary>¿Cuánto cuesta usar Llamita?</summary>
+        <p>Para los conductores es totalmente gratis, sin registrarte.</p>
+      </details>
+      <details>
+        <summary>¿Cubren la Zona Sur y El Alto?</summary>
+        <p>Sí. Cubrimos La Paz y El Alto — Centro, Sopocachi, Miraflores, San Miguel, Calacoto y toda la Zona Sur — y sumamos más parqueos constantemente.</p>
+      </details>
+    </div>
 
-    <p class="center" style="margin:38px 0"><a class="btn btn-lima" href="/app">Abrir el mapa de parqueos de La Paz →</a></p>
+    <div class="cta-band">
+      <h2>Tu próximo parqueo, sin dar vueltas</h2>
+      <p>Abre el mapa en vivo de La Paz y El Alto.</p>
+      <a class="btn btn-lima" href="/app">Ver parqueos disponibles →</a>
+    </div>
   </main>
 
   <footer class="site">
