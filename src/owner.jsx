@@ -1,7 +1,39 @@
 // owner.jsx — Owner dashboard
 // window.LlamitaOwner = { OwnerApp }
 
-const { formatBs, parseHM, fmtDuration, calcPrice, useIsMobile } = window.LlamitaData;
+const { formatBs, parseHM, fmtDuration, calcPrice, useIsMobile, locate } = window.LlamitaData;
+
+// Small "usar mi ubicación actual" button, reused by the create flow (desktop
+// drawer + mobile placement overlay). Calls onLocated({lat,lng}) on success.
+function UseMyLocationButton({ onLocated, dark }) {
+  var [busy, setBusy] = React.useState(false);
+  var [err, setErr] = React.useState(null);
+  var go = function() {
+    setErr(null); setBusy(true);
+    locate()
+      .then(function(pos) { onLocated({ lat: pos.lat, lng: pos.lng }); })
+      .catch(function(e) {
+        setErr(e && e.message === 'permission'
+          ? 'Activa el permiso de ubicación o toca el mapa.'
+          : 'No pudimos obtener tu ubicación; toca el mapa.');
+      })
+      .finally(function() { setBusy(false); });
+  };
+  return (
+    <div style={{ textAlign: 'center' }}>
+      <button onClick={go} disabled={busy} style={{
+        display: 'inline-flex', alignItems: 'center', gap: 8, cursor: busy ? 'default' : 'pointer',
+        padding: '10px 16px', borderRadius: 10, fontSize: 13, fontWeight: 700,
+        border: '1px solid ' + (dark ? 'rgba(255,255,255,0.35)' : '#052E22'),
+        background: dark ? 'rgba(255,255,255,0.12)' : '#052E22',
+        color: '#fff', opacity: busy ? 0.7 : 1, fontFamily: 'var(--font-sans)',
+      }}>
+        📍 {busy ? 'Ubicando…' : 'Usar mi ubicación actual'}
+      </button>
+      {err && <div style={{ marginTop: 8, fontSize: 11, color: dark ? '#ffd7d1' : '#c0392b' }}>{err}</div>}
+    </div>
+  );
+}
 
 // ─── Utilities ──────────────────────────────────────────────────────────────
 
@@ -308,9 +340,10 @@ function CreateLotDrawer({ pendingLatLng, onSave, onCancel, onChange }) {
           <div>
             <div style={{ fontSize: 36, marginBottom: 12 }}>📍</div>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#111', marginBottom: 6 }}>Ubica el parqueo en el mapa</div>
-            <div style={{ fontSize: 12, color: '#888', lineHeight: 1.6 }}>
-              Haz clic en el mapa de la izquierda en la ubicación exacta de tu parqueo para continuar.
+            <div style={{ fontSize: 12, color: '#888', lineHeight: 1.6, marginBottom: 18 }}>
+              Usa tu ubicación actual, o haz clic en el mapa de la izquierda en la ubicación exacta de tu parqueo.
             </div>
+            <UseMyLocationButton onLocated={onChange} />
           </div>
         </div>
       )}
@@ -736,7 +769,8 @@ function MapSection({ store, lots, lot, onSelectLot, session, lotEdits, refreshE
           <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
             <OwnerLeafletMap lots={lots} selectedId={null} onSelectLot={function() {}} placingMode={true} onPlace={setPendingLatLng} pendingLatLng={pendingLatLng} />
             <div style={{ position: 'absolute', top: 12, left: 12, right: 12, zIndex: 1200, background: 'rgba(255,255,255,0.96)', border: '1px solid #e8e8e8', borderRadius: 10, padding: '10px 12px', textAlign: 'center', fontSize: 13, color: '#555', boxShadow: '0 2px 12px rgba(0,0,0,0.12)' }}>
-              📍 Toca el punto exacto de tu parqueo en el mapa
+              <div style={{ marginBottom: 10 }}>📍 Usa tu ubicación actual o toca el punto exacto en el mapa</div>
+              <UseMyLocationButton onLocated={setPendingLatLng} />
             </div>
           </div>
         </div>

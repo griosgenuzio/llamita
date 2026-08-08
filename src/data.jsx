@@ -257,6 +257,38 @@ function useLlamitaStore() {
   };
 }
 
+// One-shot device location. Resolves { lat, lng, accuracy } or rejects with an
+// Error whose message is a stable code ('unsupported' | 'permission' | 'timeout'
+// | 'unavailable'). Requires a secure context (HTTPS or localhost).
+function locate(opts) {
+  return new Promise(function (resolve, reject) {
+    if (!navigator || !navigator.geolocation) return reject(new Error('unsupported'));
+    navigator.geolocation.getCurrentPosition(
+      function (p) { resolve({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }); },
+      function (err) {
+        var code = err && err.code === 1 ? 'permission'
+                 : err && err.code === 3 ? 'timeout'
+                 : 'unavailable';
+        reject(new Error(code));
+      },
+      Object.assign({ enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }, opts || {})
+    );
+  });
+}
+
+// Great-circle distance in kilometres between two {lat,lng} points (haversine).
+// Used only to order the driver list nearest-first.
+function distanceKm(a, b) {
+  if (!a || !b) return Infinity;
+  var R = 6371;
+  var dLat = (b.lat - a.lat) * Math.PI / 180;
+  var dLng = (b.lng - a.lng) * Math.PI / 180;
+  var la1 = a.lat * Math.PI / 180, la2 = b.lat * Math.PI / 180;
+  var h = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.sin(dLng / 2) * Math.sin(dLng / 2) * Math.cos(la1) * Math.cos(la2);
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
 // Reactive viewport check for responsive layouts (default breakpoint 640px).
 function useIsMobile(bp) {
   const q = '(max-width: ' + (bp || 640) + 'px)';
@@ -275,4 +307,5 @@ function useIsMobile(bp) {
 window.LlamitaData = {
   useLlamitaStore, useIsMobile,
   formatBs, parseHM, fmtDuration, calcPrice,
+  locate, distanceKm,
 };

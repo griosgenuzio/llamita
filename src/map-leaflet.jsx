@@ -18,6 +18,9 @@
     'box-shadow:none!important;font:700 11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace!important;' +
     'white-space:nowrap!important}' +
     '.leaflet-tooltip.llamita-lbl::before{display:none!important}' +
+    // Driver's own-location triangle: a bare divIcon (Leaflet otherwise gives
+    // divIcons a white box background + border).
+    '.llamita-me{background:transparent!important;border:none!important}' +
     '.leaflet-control-attribution{font-size:9px!important}';
   document.head.appendChild(s);
 }());
@@ -27,11 +30,13 @@ var LOW   = '#E67E22'; // 1–4 free
 var FULL  = '#E74C3C'; // 0 free (LLENO)
 var REF   = '#052E22'; // reference lot (verde noche — no availability)
 
-function LeafletParkingMap({ lots, selectedId, onSelect, filterFn, pulseLotId }) {
+function LeafletParkingMap({ lots, selectedId, onSelect, filterFn, pulseLotId, userLoc }) {
   var containerRef = React.useRef(null);
   var mapRef       = React.useRef(null);
   var markersRef   = React.useRef({});
   var readyRef     = React.useRef(false);
+  var userRef      = React.useRef(null);   // { marker, ring } for the driver's own position
+  var userDoneRef  = React.useRef(false);  // whether we've recentred on the first fix
 
   // Always-current refs — Leaflet callbacks must never close over stale props
   var onSelectRef = React.useRef(onSelect);  onSelectRef.current  = onSelect;
@@ -180,6 +185,51 @@ function LeafletParkingMap({ lots, selectedId, onSelect, filterFn, pulseLotId })
     var t = setTimeout(function() { if (span) span.style.transform = 'scale(1)'; }, 300);
     return function() { clearTimeout(t); };
   }, [pulseLotId]);
+
+  // ── Driver's own location: a blue TRIANGLE (distinct from every round dot /
+  //    count pill / reference dot) plus a faint accuracy ring. ────────────────
+  React.useEffect(function() {
+    var map = mapRef.current;
+    if (!map || !readyRef.current) return;
+
+    if (!userLoc) {
+      if (userRef.current) {
+        if (userRef.current.marker) userRef.current.marker.remove();
+        if (userRef.current.ring) userRef.current.ring.remove();
+        userRef.current = null;
+      }
+      userDoneRef.current = false;
+      return;
+    }
+
+    var ll = [userLoc.lat, userLoc.lng];
+    if (!userRef.current) {
+      var html =
+        '<svg width="30" height="30" viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg">' +
+        '<polygon points="15,3 26,26 4,26" fill="#2563EB" stroke="#fff" stroke-width="2.5" ' +
+        'stroke-linejoin="round" style="filter:drop-shadow(0 2px 4px rgba(0,0,0,.35))"/></svg>';
+      var icon = L.divIcon({ html: html, className: 'llamita-me', iconSize: [30, 30], iconAnchor: [15, 18] });
+      var marker = L.marker(ll, { icon: icon, interactive: false, keyboard: false, zIndexOffset: 1000 });
+      var ring = L.circle(ll, {
+        radius: Math.min(userLoc.accuracy || 0, 200),
+        color: '#2563EB', weight: 1, opacity: 0.35,
+        fillColor: '#2563EB', fillOpacity: 0.08,
+      });
+      ring.addTo(map);
+      marker.addTo(map);
+      userRef.current = { marker: marker, ring: ring };
+    } else {
+      userRef.current.marker.setLatLng(ll);
+      userRef.current.ring.setLatLng(ll);
+      userRef.current.ring.setRadius(Math.min(userLoc.accuracy || 0, 200));
+    }
+
+    // Recenter once, on the first fix, so nearby lots come into view.
+    if (!userDoneRef.current) {
+      map.setView(ll, Math.max(map.getZoom(), 15), { animate: true });
+      userDoneRef.current = true;
+    }
+  }, [userLoc ? userLoc.lat : null, userLoc ? userLoc.lng : null, userLoc ? userLoc.accuracy : null]);
 
   return <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} />;
 }

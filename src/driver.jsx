@@ -2,7 +2,7 @@
 // window.LlamitaDriver = { DriverApp }
 
 const { LeafletParkingMap } = window.LlamitaLeafletMap;
-const { formatBs } = window.LlamitaData;
+const { formatBs, locate, distanceKm } = window.LlamitaData;
 
 const AVAIL = '#32C87A';
 const FULL  = '#E05A4B';
@@ -244,6 +244,22 @@ function DriverApp({ store, session, onSignOut }) {
   const [filters, setFilters] = React.useState({ available: false, covered: false, key: false });
   const [view, setView] = React.useState('mapa');
   const [showRefs, setShowRefs] = React.useState(false); // references in the list, on demand
+  const [userLoc, setUserLoc] = React.useState(null);    // driver's own position (triangle marker)
+  const [locating, setLocating] = React.useState(false);
+  const [locError, setLocError] = React.useState(null);
+
+  const handleLocate = React.useCallback(() => {
+    setLocError(null);
+    setLocating(true);
+    locate()
+      .then((pos) => { setUserLoc(pos); setView('mapa'); })
+      .catch((e) => {
+        setLocError(e && e.message === 'permission'
+          ? 'Activa el permiso de ubicación para verte en el mapa.'
+          : 'No pudimos obtener tu ubicación. Intenta de nuevo.');
+      })
+      .finally(() => setLocating(false));
+  }, []);
 
   const sess = session || { name: 'Conductor', email: '', initials: 'C', role: 'conductor' };
   const handleSignOut = onSignOut || (() => {});
@@ -275,7 +291,15 @@ function DriverApp({ store, session, onSignOut }) {
   const standard  = approved.filter(l => l.kind !== 'reference');
   const references = approved.filter(l => l.kind === 'reference');
   const selected  = approved.find(l => l.id === selectedId); // may be a reference pin
-  const visible   = standard.filter(filterFn);
+  let visible     = standard.filter(filterFn);
+  // Once the driver has located themselves, order the list nearest-first.
+  if (userLoc) {
+    visible = visible
+      .map(l => ({ l, d: distanceKm(userLoc, { lat: l.lat, lng: l.lng }) }))
+      .sort((a, b) => a.d - b.d)
+      .map(x => x.l);
+  }
+  const distanceTo = (l) => (userLoc ? distanceKm(userLoc, { lat: l.lat, lng: l.lng }) : null);
   const totalAvail = visible.reduce((s, l) => s + Math.max(0, l.total - l.occupied), 0);
 
   return (
@@ -294,8 +318,53 @@ function DriverApp({ store, session, onSignOut }) {
           onSelect={(l) => selectLot(l ? l.id : null)}
           filterFn={filterFn}
           pulseLotId={pulseLotId}
+          userLoc={userLoc}
         />
       </div>
+
+      {/* ── "Mi ubicación" button (map view only), above the zoom control ── */}
+      {view === 'mapa' && (
+        <button
+          onClick={handleLocate}
+          disabled={locating}
+          aria-label="Ver mi ubicación"
+          title="Ver mi ubicación"
+          style={{
+            position: 'absolute', right: 12, bottom: 96, zIndex: 10,
+            width: 46, height: 46, borderRadius: '50%',
+            border: '1px solid rgba(0,0,0,0.1)',
+            background: userLoc ? '#2563EB' : '#fff',
+            color: userLoc ? '#fff' : '#2563EB',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.18)',
+            cursor: locating ? 'default' : 'pointer', opacity: locating ? 0.7 : 1,
+          }}
+        >
+          {locating ? (
+            <span style={{
+              width: 18, height: 18, borderRadius: '50%',
+              border: '2px solid currentColor', borderTopColor: 'transparent',
+              display: 'inline-block', animation: 'llamita-spin 0.8s linear infinite',
+            }}/>
+          ) : (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3.2"/>
+              <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+            </svg>
+          )}
+        </button>
+      )}
+      {locError && view === 'mapa' && (
+        <div style={{
+          position: 'absolute', left: '50%', bottom: 150, transform: 'translateX(-50%)',
+          zIndex: 11, maxWidth: '86%', textAlign: 'center',
+          background: 'rgba(0,0,0,0.82)', color: '#fff', borderRadius: 10,
+          padding: '9px 14px', fontSize: 12.5, lineHeight: 1.4,
+        }} onClick={() => setLocError(null)}>
+          {locError}
+        </div>
+      )}
 
       {/* ── Floating header ── */}
       <div style={{
@@ -366,6 +435,8 @@ function DriverApp({ store, session, onSignOut }) {
             {visible.map(lot => {
               const avail = Math.max(0, lot.total - lot.occupied);
               const full = avail === 0;
+              const d = distanceTo(lot);
+              const dLabel = d == null ? null : (d < 1 ? `${Math.round(d * 1000)} m` : `${d.toFixed(1).replace('.', ',')} km`);
               return (
                 <button key={lot.id} onClick={() => { selectLot(lot.id); setView('mapa'); }} style={{
                   textAlign: 'left', padding: '14px 16px', borderRadius: 12,
@@ -381,6 +452,12 @@ function DriverApp({ store, session, onSignOut }) {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lot.name}</div>
                     <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#999', marginTop: 2 }}>{lot.address}</div>
+                    {dLabel && (
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#2563EB', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{ display: 'inline-block', width: 0, height: 0, borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderBottom: '7px solid #2563EB' }}/>
+                        a {dLabel}
+                      </div>
+                    )}
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: full ? FULL : AVAIL }}>
