@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es-BO"><head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Llamita — Mapa de parqueos en vivo</title>
+  <meta name="description" content="Mapa en vivo de parqueos y estacionamientos disponibles en La Paz y El Alto.">
+  <!-- The app shell is thin (login/map behind JS); the indexable content lives
+       on / and the /parqueos-la-paz, /estacionamientos-la-paz pages. -->
+  <meta name="robots" content="noindex, follow">
+  <meta name="theme-color" content="#052E22">
+  <link rel="canonical" href="https://parqueosllamita.com/app">
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/brand/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/brand/favicon-16.png">
+  <link rel="apple-touch-icon" href="/assets/brand/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.json">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geomini:wght@400;500;700&family=Open+Sans:wght@400;600;700&display=swap">
+
+  <style>
+    :root {
+      --c-bg: #F4F7F2;
+      --c-surface: #ffffff;
+      --c-border: #E2E8DE;
+      --c-grid: #EAF0E6;
+      --c-line: #D6DFD3;
+      --c-text: #052E22;
+      --c-muted: #5B6B62;
+      --c-accent: #052E22;   /* verde noche — primary interactive */
+      --c-lime: #A3E635;     /* lima neon — highlights / accents */
+      --c-avail: #27AE60;
+      --c-full:  #E74C3C;
+      --c-map-bg: #F4F7F2;
+      --font-sans: 'Geomini', system-ui, -apple-system, sans-serif;
+      --font-mono: 'Open Sans', system-ui, -apple-system, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--c-bg); min-height: 100vh; width: 100%; max-width: 100%; overflow-x: hidden; }
+    body { font-family: var(--font-sans); color: var(--c-text); -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%; }
+    img { max-width: 100%; }
+    button { font-family: inherit; }
+    @keyframes llamita-blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    @keyframes llamita-pulse { 0%{width:14px;height:14px;opacity:0.6} 100%{width:80px;height:80px;opacity:0} }
+    @keyframes llamita-sheet-up { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
+    @keyframes llamita-fade { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes llamita-spin { to { transform: rotate(360deg); } }
+    *::-webkit-scrollbar { width:6px;height:6px } *::-webkit-scrollbar-thumb{background:var(--c-border);border-radius:3px} *::-webkit-scrollbar-track{background:transparent}
+    #root { animation: llamita-fade 0.3s ease-out; }
+  </style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+  <div id="root">
+    <!-- Branded loading state until React mounts. -->
+    <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px;background:#F4F7F2">
+      <img src="/assets/brand/logo-horizontal.png" alt="Llamita" width="180" style="max-width:60vw;height:auto">
+      <div style="margin-top:26px;width:34px;height:34px;border:3px solid #E2E8DE;border-top-color:#052E22;border-radius:50%;animation:llamita-spin 0.8s linear infinite"></div>
+      <p style="font-family:'Open Sans',system-ui,sans-serif;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#5B6B62;margin-top:20px">Cargando el mapa…</p>
+    </div>
+  </div>
+
+  <script src="/vendor/react.js" integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z" crossorigin="anonymous"></script>
+  <script src="/vendor/react-dom.js" integrity="sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script src="/dist/api.js"></script>
+  <script src="/dist/analytics.js"></script>
+  <script src="/dist/auth.js"></script>
+  <script src="/dist/data.js"></script>
+  <script src="/dist/map-leaflet.js"></script>
+  <script src="/dist/driver.js"></script>
+  <script src="/dist/owner.js"></script>
+  <script src="/dist/admin.js"></script>
+  <script src="/dist/main.js"></script>
+</body></html>
