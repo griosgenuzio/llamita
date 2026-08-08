@@ -68,7 +68,61 @@ function UserMenu({ session, onSignOut }) {
   );
 }
 
-function LotDetailSheet({ lot, onClose }) {
+function fmtEta(s) { const m = Math.max(1, Math.round((s || 0) / 60)); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + (m % 60) + ' min'; }
+function fmtDist(m) { return (m || 0) < 1000 ? Math.round(m || 0) + ' m' : (m / 1000).toFixed(1).replace('.', ',') + ' km'; }
+
+// In-app directions panel: shown once a route is fetched (ETA · distance + a
+// collapsible turn list + "Cerrar ruta"), or a graceful fallback on error.
+function RoutePanel({ lot, route, routeError, onClearRoute }) {
+  const [open, setOpen] = React.useState(false);
+  const mapsUrl = lot && lot.lat && lot.lng
+    ? `https://www.google.com/maps/dir/?api=1&destination=${lot.lat},${lot.lng}` : null;
+
+  if (route) {
+    return (
+      <div style={{ marginTop: 12, border: '1px solid #e6eefb', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 14px', background: '#f4f8ff' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+            <span style={{ fontSize: 17 }}>🚗</span>
+            <div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700, color: '#1d4ed8' }}>{fmtEta(route.durationS)} · {fmtDist(route.distanceM)}</div>
+              <div style={{ fontSize: 11, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>Ruta en auto hasta {lot.name}</div>
+            </div>
+          </div>
+          <button onClick={onClearRoute} style={{ flexShrink: 0, padding: '7px 12px', borderRadius: 999, border: '1px solid #d7e2f6', background: '#fff', color: '#1d4ed8', fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Cerrar ruta</button>
+        </div>
+        {route.steps && route.steps.length > 0 && (
+          <React.Fragment>
+            <button onClick={() => setOpen(o => !o)} style={{ width: '100%', textAlign: 'left', padding: '10px 14px', background: '#fff', border: 'none', borderTop: '1px solid #eef2f7', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 12.5, fontWeight: 600, color: '#374151' }}>
+              {open ? 'Ocultar indicaciones' : `Ver indicaciones (${route.steps.length})`}
+            </button>
+            {open && (
+              <ol style={{ listStyle: 'none', margin: 0, padding: '2px 14px 12px' }}>
+                {route.steps.map((s, i) => (
+                  <li key={i} style={{ display: 'flex', gap: 10, padding: '8px 0', borderTop: i ? '1px solid #f3f4f6' : 'none' }}>
+                    <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: '50%', background: '#e8f0ff', color: '#1d4ed8', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>
+                    <span style={{ fontSize: 13, color: '#374151', lineHeight: 1.4 }}>{s.text}{s.distanceM ? <span style={{ color: '#9ca3af' }}> · {fmtDist(s.distanceM)}</span> : null}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </React.Fragment>
+        )}
+      </div>
+    );
+  }
+  if (routeError) {
+    return (
+      <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 10, background: '#fff7f5', border: '1px solid #f3d6cf', fontSize: 12.5, color: '#9a3f2f', textAlign: 'center', lineHeight: 1.5 }}>
+        {routeError === 'nolocation' ? 'Activa tu ubicación para ver la ruta en el mapa. ' : 'No pudimos trazar la ruta ahora. '}
+        {mapsUrl && <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#1d4ed8', fontWeight: 600 }}>Abrir en Maps</a>}
+      </div>
+    );
+  }
+  return null;
+}
+
+function LotDetailSheet({ lot, onClose, onDirections, route, routeLoading, routeError, onClearRoute }) {
   if (!lot) return null;
   const available = Math.max(0, lot.total - lot.occupied);
   const full = available === 0;
@@ -82,10 +136,6 @@ function LotDetailSheet({ lot, onClose }) {
     { k: 'Horario',           v: lot.hours },
     { k: 'Métodos de pago',   v: lot.payment.join(' · ') },
   ];
-
-  const directionsUrl = lot.lat && lot.lng
-    ? `https://www.google.com/maps/dir/?api=1&destination=${lot.lat},${lot.lng}`
-    : null;
 
   return (
     <div style={{
@@ -156,34 +206,28 @@ function LotDetailSheet({ lot, onClose }) {
             +{formatBs(lot.fees.addHour)} c/hora adicional
           </div>
         </div>
-        {directionsUrl && !full ? (
-          <a href={directionsUrl} target="_blank" rel="noopener noreferrer" style={{
+        <button
+          onClick={() => { if (!full && !routeLoading) onDirections(lot); }}
+          disabled={full || routeLoading}
+          style={{
             padding: '11px 18px', borderRadius: 999, border: 'none',
-            background: 'var(--c-accent)', color: '#fff',
+            background: full ? '#eee' : 'var(--c-accent)', color: full ? '#aaa' : '#fff',
             fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 600,
-            cursor: 'pointer', textDecoration: 'none', whiteSpace: 'nowrap',
-            flexShrink: 0,
-          }}>Cómo llegar →</a>
-        ) : (
-          <button disabled style={{
-            padding: '11px 18px', borderRadius: 999, border: 'none',
-            background: '#eee', color: '#aaa',
-            fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 600,
-            cursor: 'not-allowed', whiteSpace: 'nowrap', flexShrink: 0,
-          }}>{full ? 'Sin cupos' : 'Cómo llegar'}</button>
-        )}
+            cursor: full ? 'not-allowed' : (routeLoading ? 'default' : 'pointer'),
+            whiteSpace: 'nowrap', flexShrink: 0, opacity: routeLoading ? 0.75 : 1,
+          }}>{full ? 'Sin cupos' : (routeLoading ? 'Trazando…' : 'Cómo llegar')}</button>
       </div>
+
+      <RoutePanel lot={lot} route={route} routeError={routeError} onClearRoute={onClearRoute} />
     </div>
   );
 }
 
 // Bottom sheet for a reference lot (admin-placed pin, no managed data): explains
 // what it is and offers a one-tap "this lot no longer exists" report to Llamita.
-function ReferenceLotSheet({ lot, onClose }) {
+function ReferenceLotSheet({ lot, onClose, onDirections, route, routeLoading, routeError, onClearRoute }) {
   const [sent, setSent] = React.useState(false);
   const [sending, setSending] = React.useState(false);
-  const directionsUrl = lot.lat && lot.lng
-    ? `https://www.google.com/maps/dir/?api=1&destination=${lot.lat},${lot.lng}` : null;
 
   function report() {
     setSending(true);
@@ -214,13 +258,17 @@ function ReferenceLotSheet({ lot, onClose }) {
       <div style={{ border: '1px solid #f0f0f0', borderRadius: 12, padding: '12px 14px', marginBottom: 14, fontSize: 13, color: '#555', lineHeight: 1.6 }}>
         Llamita agregó este parqueo como <b>referencia</b> porque existía cuando se registró. Llamita no gestiona su disponibilidad, tarifas ni características — confírmalas en el lugar.
       </div>
-      {directionsUrl && (
-        <a href={directionsUrl} target="_blank" rel="noopener noreferrer" style={{
-          display: 'block', textAlign: 'center', padding: '11px', borderRadius: 10,
-          background: 'var(--c-lime)', color: 'var(--c-accent)', fontWeight: 700, fontSize: 14,
-          textDecoration: 'none', marginBottom: 10,
-        }}>Cómo llegar →</a>
+      {lot.lat && lot.lng && (
+        <button onClick={() => { if (!routeLoading) onDirections(lot); }} disabled={routeLoading} style={{
+          display: 'block', width: '100%', textAlign: 'center', padding: '11px', borderRadius: 10,
+          border: 'none', background: 'var(--c-lime)', color: 'var(--c-accent)', fontWeight: 700, fontSize: 14,
+          cursor: routeLoading ? 'default' : 'pointer', marginBottom: 10, opacity: routeLoading ? 0.75 : 1,
+          fontFamily: 'var(--font-sans)',
+        }}>{routeLoading ? 'Trazando ruta…' : 'Cómo llegar'}</button>
       )}
+      <RoutePanel lot={lot} route={route} routeError={routeError} onClearRoute={onClearRoute} />
+      <div style={{ height: (route || routeError) ? 12 : 0 }} />
+
       {sent ? (
         <div style={{ textAlign: 'center', padding: '11px', borderRadius: 10, background: 'rgba(5,46,34,0.06)', color: 'var(--c-accent)', fontSize: 13, fontWeight: 600 }}>
           ¡Gracias! Avisaste a Llamita.
@@ -260,6 +308,41 @@ function DriverApp({ store, session, onSignOut }) {
       })
       .finally(() => setLocating(false));
   }, []);
+
+  // In-app driving directions (route drawn on the map, no redirect to Maps).
+  const [route, setRoute] = React.useState(null);           // { geometry, steps, distanceM, durationS, lotId }
+  const [routeLoading, setRouteLoading] = React.useState(false);
+  const [routeError, setRouteError] = React.useState(null); // 'nolocation' | 'route' | null
+
+  const clearRoute = React.useCallback(() => { setRoute(null); setRouteError(null); }, []);
+
+  const handleDirections = React.useCallback(async (lot) => {
+    if (!lot || !lot.lat || !lot.lng) return;
+    setRouteError(null);
+    let origin = userLoc;
+    if (!origin) {
+      try { origin = await locate(); setUserLoc(origin); }
+      catch (e) { setRouteError('nolocation'); return; }
+    }
+    setRouteLoading(true);
+    try {
+      if (!(window.LlamitaApi && window.LlamitaApi.isAvailable())) throw new Error('offline');
+      const q = `from=${origin.lat},${origin.lng}&to=${lot.lat},${lot.lng}`;
+      const r = await window.LlamitaApi.req('GET', '/api/route?' + q);
+      setRoute({ geometry: r.geometry, steps: r.steps, distanceM: r.distanceM, durationS: r.durationS, lotId: lot.id });
+      setView('mapa');
+      try { window.LlamitaAnalytics.track('directions_shown', { lotId: lot.id }); } catch (e) {}
+    } catch (e) {
+      setRouteError('route');
+    } finally {
+      setRouteLoading(false);
+    }
+  }, [userLoc]);
+
+  // Drop the route when the sheet is closed or a different lot is selected.
+  React.useEffect(() => {
+    if (route && route.lotId !== selectedId) { setRoute(null); setRouteError(null); }
+  }, [selectedId]);
 
   const sess = session || { name: 'Conductor', email: '', initials: 'C', role: 'conductor' };
   const handleSignOut = onSignOut || (() => {});
@@ -319,6 +402,7 @@ function DriverApp({ store, session, onSignOut }) {
           filterFn={filterFn}
           pulseLotId={pulseLotId}
           userLoc={userLoc}
+          route={route ? route.geometry : null}
         />
       </div>
 
@@ -544,8 +628,12 @@ function DriverApp({ store, session, onSignOut }) {
       {selected && (
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 20 }}>
           {selected.kind === 'reference'
-            ? <ReferenceLotSheet lot={selected} onClose={() => setSelectedId(null)} />
-            : <LotDetailSheet lot={selected} onClose={() => setSelectedId(null)} />}
+            ? <ReferenceLotSheet lot={selected} onClose={() => setSelectedId(null)}
+                onDirections={handleDirections} route={route && route.lotId === selected.id ? route : null}
+                routeLoading={routeLoading} routeError={routeError} onClearRoute={clearRoute} />
+            : <LotDetailSheet lot={selected} onClose={() => setSelectedId(null)}
+                onDirections={handleDirections} route={route && route.lotId === selected.id ? route : null}
+                routeLoading={routeLoading} routeError={routeError} onClearRoute={clearRoute} />}
         </div>
       )}
     </div>

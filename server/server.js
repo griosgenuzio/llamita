@@ -79,6 +79,13 @@ const OPERATIONAL_LOT_FIELDS = ['occupied', 'fees', 'payment'];
 // users/lots/events on next boot. Idempotent per token value (runs once).
 const RESET_TOKEN = process.env.LLAMITA_RESET_DATA || '';
 
+// Driving-directions engine. Defaults to the public OSRM demo server (keyless —
+// fine for launch/low traffic). Point LLAMITA_OSRM_URL at a self-hosted or other
+// OSRM-compatible engine later with no client change.
+const OSRM_URL = (process.env.LLAMITA_OSRM_URL || 'https://router.project-osrm.org').replace(/\/$/, '');
+const ROUTE_CACHE_TTL_MS = 5 * 60 * 1000;
+const ROUTE_CACHE_MAX = 500;
+
 // ─────────── Database ───────────
 const db = new DatabaseSync(DB_PATH);
 db.exec(`
@@ -470,6 +477,93 @@ function sniffImage(buf, ext) {
   if (ext === 'png' && png) return 'image/png';
   if (ext === 'webp' && webp) return 'image/webp';
   return null;
+}
+
+// ─────────── Routing (driving directions) ───────────
+// Parses "lat,lng" and returns { lat, lng } if both are finite and in range.
+function parseLatLng(s) {
+  if (!s) return null;
+  const parts = String(s).split(',');
+  if (parts.length !== 2) return null;
+  const lat = Number(parts[0]), lng = Number(parts[1]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+  return { lat, lng };
+}
+
+// Tiny TTL cache so repeated / near-identical direction requests are instant and
+// the routing engine isn't hammered.
+const _routeCache = new Map(); // key -> { at, value }
+function routeCacheGet(key) {
+  const e = _routeCache.get(key);
+  if (!e) return null;
+  if (Date.now() - e.at > ROUTE_CACHE_TTL_MS) { _routeCache.delete(key); return null; }
+  return e.value;
+}
+function routeCacheSet(key, value) {
+  if (_routeCache.size >= ROUTE_CACHE_MAX) { _routeCache.delete(_routeCache.keys().next().value); }
+  _routeCache.set(key, { at: Date.now(), value });
+}
+
+// Composes a short Spanish instruction from an OSRM maneuver + road name.
+function spanishStep(maneuver, name) {
+  const road = name ? ` por ${name}` : '';
+  const at = name ? ` en ${name}` : '';
+  const type = maneuver && maneuver.type;
+  const mod = maneuver && maneuver.modifier;
+  const dir = /left/.test(mod || '') ? 'la izquierda'
+            : /right/.test(mod || '') ? 'la derecha' : null;
+  switch (type) {
+    case 'depart':   return `Sal${road}`;
+    case 'arrive':   return 'Llegaste a tu destino';
+    case 'turn':     return dir ? `Gira a ${dir}${at}` : `Continúa${road}`;
+    case 'end of road': return dir ? `Al final de la vía, gira a ${dir}${at}` : `Continúa${road}`;
+    case 'fork':     return dir ? `Mantente a ${dir}${at}` : `Continúa${road}`;
+    case 'merge':    return `Incorpórate${road}`;
+    case 'on ramp':  return `Toma la vía de acceso${road}`;
+    case 'off ramp': return `Toma la salida${road}`;
+    case 'roundabout':
+    case 'rotary':   return `Toma la rotonda${road ? ' y sal' + road : ''}`;
+    case 'continue':
+    case 'new name': return `Continúa${road}`;
+    default:         return dir ? `Gira a ${dir}${at}` : `Continúa${road}`;
+  }
+}
+
+// Calls OSRM and returns the normalized route, or throws on any failure.
+async function fetchOsrmRoute(from, to) {
+  const url = `${OSRM_URL}/route/v1/driving/` +
+    `${from.lng},${from.lat};${to.lng},${to.lat}` +
+    `?overview=full&geometries=geojson&steps=true`;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 6000);
+  let data;
+  try {
+    const r = await fetch(url, { signal: ctrl.signal, headers: { 'User-Agent': 'Llamita/1.0 (parqueosllamita.com)' } });
+    if (!r.ok) throw new Error('osrm_' + r.status);
+    data = await r.json();
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!data || data.code !== 'Ok' || !Array.isArray(data.routes) || !data.routes[0]) {
+    throw new Error('no_route');
+  }
+  const route = data.routes[0];
+  const geometry = (route.geometry && route.geometry.coordinates || [])
+    .map((c) => [c[1], c[0]]); // OSRM is [lng,lat] → Leaflet [lat,lng]
+  const steps = [];
+  for (const leg of (route.legs || [])) {
+    for (const st of (leg.steps || [])) {
+      const text = spanishStep(st.maneuver, st.name);
+      if (text) steps.push({ text, distanceM: Math.round(st.distance || 0) });
+    }
+  }
+  return {
+    distanceM: Math.round(route.distance || 0),
+    durationS: Math.round(route.duration || 0),
+    geometry,
+    steps,
+  };
 }
 
 // ─────────── API routes ───────────
@@ -910,6 +1004,27 @@ async function handleApi(req, res, pathname) {
         .run(nowIso(), who.id, m[1]);
       return json(res, 200, { ok: true });
     }
+  }
+
+  // Street directions (driving) from one point to another, proxied to a routing
+  // engine so no key is exposed and the provider can be swapped via env. Returns
+  // a normalized { distanceM, durationS, geometry:[[lat,lng]…], steps:[…] }.
+  if (pathname === '/api/route' && method === 'GET') {
+    const q = new URL(req.url, 'http://x').searchParams;
+    const from = parseLatLng(q.get('from'));
+    const to = parseLatLng(q.get('to'));
+    if (!from || !to) return json(res, 400, { error: 'bad_coords' });
+    const key = `${from.lat.toFixed(4)},${from.lng.toFixed(4)}|${to.lat.toFixed(4)},${to.lng.toFixed(4)}`;
+    const cached = routeCacheGet(key);
+    if (cached) return json(res, 200, cached);
+    let route;
+    try {
+      route = await fetchOsrmRoute(from, to);
+    } catch (e) {
+      return json(res, 502, { error: 'route_unavailable' });
+    }
+    routeCacheSet(key, route);
+    return json(res, 200, route);
   }
 
   if (pathname === '/api/state' && method === 'GET') {

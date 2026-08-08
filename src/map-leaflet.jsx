@@ -34,13 +34,15 @@ var LOW   = '#E67E22'; // 1–4 free
 var FULL  = '#E74C3C'; // 0 free (LLENO)
 var REF   = '#052E22'; // reference lot (verde noche — no availability)
 
-function LeafletParkingMap({ lots, selectedId, onSelect, filterFn, pulseLotId, userLoc }) {
+function LeafletParkingMap({ lots, selectedId, onSelect, filterFn, pulseLotId, userLoc, route }) {
   var containerRef = React.useRef(null);
   var mapRef       = React.useRef(null);
   var markersRef   = React.useRef({});
   var readyRef     = React.useRef(false);
   var userRef      = React.useRef(null);   // { marker, ring } for the driver's own position
   var userDoneRef  = React.useRef(false);  // whether we've recentred on the first fix
+  var routeRef     = React.useRef(null);   // { casing, line } polylines for the drawn route
+  var routeRendRef = React.useRef(null);   // dedicated SVG renderer for a crisp route path
 
   // Always-current refs — Leaflet callbacks must never close over stale props
   var onSelectRef = React.useRef(onSelect);  onSelectRef.current  = onSelect;
@@ -145,6 +147,13 @@ function LeafletParkingMap({ lots, selectedId, onSelect, filterFn, pulseLotId, u
     map.getPane('llamitaMe').style.zIndex = 680;
     map.getPane('llamitaMe').style.pointerEvents = 'none';
 
+    // Dedicated pane + SVG renderer for the route line: above tiles, BELOW the
+    // count pills / reference dots / user triangle. SVG keeps the path crisp.
+    map.createPane('llamitaRoute');
+    map.getPane('llamitaRoute').style.zIndex = 420;
+    map.getPane('llamitaRoute').style.pointerEvents = 'none';
+    routeRendRef.current = L.svg({ pane: 'llamitaRoute' });
+
     mapRef.current   = map;
     readyRef.current = false;
 
@@ -241,6 +250,28 @@ function LeafletParkingMap({ lots, selectedId, onSelect, filterFn, pulseLotId, u
       userDoneRef.current = true;
     }
   }, [userLoc ? userLoc.lat : null, userLoc ? userLoc.lng : null, userLoc ? userLoc.accuracy : null]);
+
+  // ── Route line (driver directions): white casing + brand line, fit to view. ──
+  React.useEffect(function() {
+    var map = mapRef.current;
+    if (!map || !readyRef.current) return;
+
+    if (routeRef.current) {
+      if (routeRef.current.casing) routeRef.current.casing.remove();
+      if (routeRef.current.line) routeRef.current.line.remove();
+      routeRef.current = null;
+    }
+    if (!route || !route.length) return;
+
+    var rend = routeRendRef.current;
+    var casing = L.polyline(route, { pane: 'llamitaRoute', renderer: rend, color: '#fff', weight: 9, opacity: 0.9, lineJoin: 'round', lineCap: 'round', interactive: false });
+    var line = L.polyline(route, { pane: 'llamitaRoute', renderer: rend, color: '#2563EB', weight: 5, opacity: 0.95, lineJoin: 'round', lineCap: 'round', interactive: false });
+    casing.addTo(map);
+    line.addTo(map);
+    routeRef.current = { casing: casing, line: line };
+
+    try { map.fitBounds(line.getBounds(), { padding: [60, 60], maxZoom: 16 }); } catch (e) {}
+  }, [route]);
 
   return <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} />;
 }
