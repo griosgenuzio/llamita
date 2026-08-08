@@ -156,7 +156,9 @@
     .panel .chk { flex-shrink:0; margin-top:2px; }
     .zones { background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:30px; margin-top:26px; }
     .zones .chips { display:flex; flex-wrap:wrap; gap:9px; margin-top:14px; }
-    .zones .chips span { font-family:var(--mono); font-size:13px; background:var(--bg); border:1px solid var(--border); border-radius:999px; padding:7px 15px; }
+    .zones .chips span, .zones .chips a { font-family:var(--mono); font-size:13px; background:var(--bg); border:1px solid var(--border); border-radius:999px; padding:7px 15px; }
+    .zones .chips a { color:var(--verde); font-weight:600; border-color:#cfe0bf; }
+    .zones .chips a:hover { border-color:var(--verde); }
     .faq details { border-top:1px solid var(--border); padding:16px 0; }
     .faq details:last-child { border-bottom:1px solid var(--border); }
     .faq summary { font-weight:600; font-size:16.5px; cursor:pointer; list-style:none; display:flex; justify-content:space-between; gap:16px; }
@@ -305,8 +307,8 @@
         <p class="eyebrow" style="margin:0">Cobertura</p>
         <h2 class="title" style="font-size:22px; margin:6px 0 0">Zonas de La Paz y El Alto</h2>
         <div class="chips">
-          <span>Centro</span><span>San Pedro</span><span>Sopocachi</span><span>Miraflores</span>
-          <span>San Miguel</span><span>Calacoto</span><span>Obrajes</span><span>Zona Sur</span>
+          <a href="/parqueos-centro-la-paz">Centro</a><span>San Pedro</span><a href="/parqueos-sopocachi">Sopocachi</a><span>Miraflores</span>
+          <span>San Miguel</span><span>Calacoto</span><a href="/parqueos-obrajes">Obrajes</a><span>Zona Sur</span>
           <span>Cota Cota</span><span>El Alto</span>
         </div>
       </div>
