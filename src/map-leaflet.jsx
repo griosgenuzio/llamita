@@ -21,7 +21,11 @@
     // Driver's own-location triangle: a bare divIcon (Leaflet otherwise gives
     // divIcons a white box background + border).
     '.llamita-me{background:transparent!important;border:none!important}' +
-    '.leaflet-control-attribution{font-size:9px!important}';
+    // Attribution kept for OSM/CARTO terms, but muted: monochrome grey, no blue
+    // links, and the coloured Leaflet flag hidden.
+    '.leaflet-control-attribution{font-size:9px!important;background:rgba(255,255,255,0.55)!important;padding:0 5px!important}' +
+    '.leaflet-control-attribution,.leaflet-control-attribution a{color:#b3b7bb!important;text-decoration:none!important}' +
+    '.leaflet-attribution-flag{display:none!important}';
   document.head.appendChild(s);
 }());
 
@@ -134,6 +138,13 @@ function LeafletParkingMap({ lots, selectedId, onSelect, filterFn, pulseLotId, u
     ).addTo(map);
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    // Dedicated top pane for the driver's own-location marker so it always sits
+    // ABOVE the permanent count/reference tooltips (tooltipPane, z-index 650).
+    map.createPane('llamitaMe');
+    map.getPane('llamitaMe').style.zIndex = 680;
+    map.getPane('llamitaMe').style.pointerEvents = 'none';
+
     mapRef.current   = map;
     readyRef.current = false;
 
@@ -205,11 +216,11 @@ function LeafletParkingMap({ lots, selectedId, onSelect, filterFn, pulseLotId, u
     var ll = [userLoc.lat, userLoc.lng];
     if (!userRef.current) {
       var html =
-        '<svg width="30" height="30" viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg">' +
-        '<polygon points="15,3 26,26 4,26" fill="#2563EB" stroke="#fff" stroke-width="2.5" ' +
-        'stroke-linejoin="round" style="filter:drop-shadow(0 2px 4px rgba(0,0,0,.35))"/></svg>';
-      var icon = L.divIcon({ html: html, className: 'llamita-me', iconSize: [30, 30], iconAnchor: [15, 18] });
-      var marker = L.marker(ll, { icon: icon, interactive: false, keyboard: false, zIndexOffset: 1000 });
+        '<svg width="34" height="34" viewBox="0 0 34 34" xmlns="http://www.w3.org/2000/svg">' +
+        '<polygon points="17,3 29,29 5,29" fill="#2563EB" stroke="#fff" stroke-width="3" ' +
+        'stroke-linejoin="round" style="filter:drop-shadow(0 2px 5px rgba(0,0,0,.4))"/></svg>';
+      var icon = L.divIcon({ html: html, className: 'llamita-me', iconSize: [34, 34], iconAnchor: [17, 20] });
+      var marker = L.marker(ll, { icon: icon, interactive: false, keyboard: false, pane: 'llamitaMe' });
       var ring = L.circle(ll, {
         radius: Math.min(userLoc.accuracy || 0, 200),
         color: '#2563EB', weight: 1, opacity: 0.35,
