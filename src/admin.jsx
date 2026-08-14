@@ -570,7 +570,7 @@ function AdminApp({ store, session, onSignOut }) {
         <ReportsInbox reports={reports.reports} store={store} onChanged={reports.refresh} />
 
         {/* Users table */}
-        <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 12, overflow: 'hidden', flexShrink: 0 }}>
           <div style={{ padding: '10px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Usuarios</h3>
             <button onClick={downloadUsers} style={{ padding: '5px 11px', borderRadius: 8, border: '1px solid #ddd', background: '#fff', fontSize: 11, color: '#444', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>↓ CSV usuarios</button>
