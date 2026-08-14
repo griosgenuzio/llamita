@@ -93,6 +93,8 @@
       lot_not_approved: 'Solo puedes editar parqueos ya aprobados.',
       no_changes: 'No hiciste ningún cambio para enviar.',
       invalid_edit: 'Revisa los datos: el nombre, la dirección y la capacidad son obligatorios.',
+      cannot_delete_admin: 'No se puede eliminar la cuenta de administración.',
+      user_owns_lots: 'Este operador todavía tiene parqueos publicados. Elimínalos primero.',
     };
     return map[e && e.message] || 'No se pudo conectar con el servidor. Intenta de nuevo.';
   }

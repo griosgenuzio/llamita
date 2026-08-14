@@ -1136,6 +1136,33 @@ async function handleApi(req, res, pathname) {
     });
   }
 
+  // Admin deletes a single user account and everything tied to it (session
+  // tokens, events, uploaded files). Refuses to delete the admin, or an operator
+  // that still owns lot listings (those must be removed first to avoid orphans).
+  {
+    const m = /^\/api\/admin\/user\/([^/]+)$/.exec(pathname);
+    if (m && method === 'DELETE') {
+      const who = authFrom(req);
+      if (!who || who.role !== 'admin') return json(res, 403, { error: 'forbidden' });
+      const targetId = m[1];
+      if (targetId === 'admin') return json(res, 400, { error: 'cannot_delete_admin' });
+      const u = db.prepare('SELECT id, email FROM users WHERE id = ?').get(targetId);
+      if (!u) return json(res, 404, { error: 'not_found' });
+      const ownsLots = db.prepare('SELECT COUNT(*) AS n FROM lot_verifications WHERE owner_id = ?').get(targetId).n;
+      if (ownsLots > 0) return json(res, 409, { error: 'user_owns_lots' });
+      // Remove uploaded files this user owns (drivers usually have none), then rows.
+      for (const up of db.prepare('SELECT id, ext FROM uploads WHERE owner_id = ?').all(targetId)) {
+        try { fs.unlinkSync(path.join(UPLOAD_DIR, `${up.id}.${up.ext}`)); } catch (e) {}
+      }
+      db.prepare('DELETE FROM uploads WHERE owner_id = ?').run(targetId);
+      db.prepare('DELETE FROM tokens WHERE user_id = ?').run(targetId);
+      db.prepare('DELETE FROM events WHERE user_id = ?').run(targetId);
+      db.prepare('DELETE FROM pending_signups WHERE email = ?').run(u.email);
+      db.prepare('DELETE FROM users WHERE id = ?').run(targetId);
+      return json(res, 200, { ok: true });
+    }
+  }
+
   if (pathname === '/api/users' && method === 'GET') {
     const who = authFrom(req);
     if (!who || who.role !== 'admin') return json(res, 403, { error: 'forbidden' });

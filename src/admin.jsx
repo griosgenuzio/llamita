@@ -465,12 +465,26 @@ function AdminApp({ store, session, onSignOut }) {
   var isMobile = _useIsMobile();
   var lots     = store.lots;
   var events   = _useEvents();
-  var accounts = useAccounts();
+  var accountsAll = useAccounts();
   var verifs   = useVerifications();
   var reports  = useReports();
 
   var [roleFilter, setRoleFilter] = React.useState('todos');
   var [period, setPeriod]         = React.useState('todos');
+  // Accounts deleted this session — hidden immediately until the 10 s poll drops
+  // them from /api/users too.
+  var [deletedIds, setDeletedIds] = React.useState({});
+  var [deletingId, setDeletingId] = React.useState(null);
+  var accounts = accountsAll.filter(function(a) { return !deletedIds[a.id]; });
+
+  function deleteUser(u) {
+    if (!window.confirm('¿Eliminar la cuenta de ' + u.name + ' (' + u.email + ')?\n\nEsta acción no se puede deshacer.')) return;
+    setDeletingId(u.id);
+    window.LlamitaApi.req('DELETE', '/api/admin/user/' + encodeURIComponent(u.id))
+      .then(function() { setDeletedIds(function(d) { var n = Object.assign({}, d); n[u.id] = true; return n; }); })
+      .catch(function(e) { window.alert('No se pudo eliminar: ' + window.LlamitaApi.errorMessage(e)); })
+      .finally(function() { setDeletingId(null); });
+  }
 
   var now = Date.now();
   var periodMs = period === 'hoy' ? 24*3600e3 : period === '7d' ? 7*24*3600e3 : Infinity;
@@ -570,11 +584,12 @@ function AdminApp({ store, session, onSignOut }) {
                   <th style={Object.assign({}, ADM_TH, { textAlign: 'right' })}>Usos efectivos</th>
                   <th style={Object.assign({}, ADM_TH, { textAlign: 'right' })}>Eventos</th>
                   <th style={ADM_TH}>Última actividad</th>
+                  <th style={Object.assign({}, ADM_TH, { textAlign: 'right' })}></th>
                 </tr>
               </thead>
               <tbody>
                 {accounts.length === 0 && (
-                  <tr><td colSpan="7" style={{ padding: 28, textAlign: 'center', color: '#bbb', fontSize: 12 }}>Aún no hay cuentas registradas</td></tr>
+                  <tr><td colSpan="8" style={{ padding: 28, textAlign: 'center', color: '#bbb', fontSize: 12 }}>Aún no hay cuentas registradas</td></tr>
                 )}
                 {accounts.map(function(u) {
                   var s = userStats(u);
@@ -587,6 +602,14 @@ function AdminApp({ store, session, onSignOut }) {
                       <td style={Object.assign({}, ADM_TD, { textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--c-accent)' })}>{s.effective}</td>
                       <td style={Object.assign({}, ADM_TD, { textAlign: 'right', fontFamily: 'var(--font-mono)', color: '#888' })}>{s.total}</td>
                       <td style={Object.assign({}, ADM_TD, { fontFamily: 'var(--font-mono)', fontSize: 11, color: '#aaa' })}>{s.last ? fmtTs(s.last) : '—'}</td>
+                      <td style={Object.assign({}, ADM_TD, { textAlign: 'right' })}>
+                        <button onClick={function() { deleteUser(u); }} disabled={deletingId === u.id} title="Eliminar cuenta" style={{
+                          padding: '4px 10px', borderRadius: 7, border: '1px solid #f0d2cc',
+                          background: '#fff', color: '#c0392b', fontFamily: 'var(--font-sans)',
+                          fontSize: 11, fontWeight: 600, cursor: deletingId === u.id ? 'default' : 'pointer',
+                          whiteSpace: 'nowrap', opacity: deletingId === u.id ? 0.6 : 1,
+                        }}>{deletingId === u.id ? 'Eliminando…' : 'Eliminar'}</button>
+                      </td>
                     </tr>
                   );
                 })}
