@@ -57,7 +57,46 @@
     return ev;
   }
 
+  // Best-effort device classification (zero-dependency). Prefers UA Client Hints
+  // (navigator.userAgentData) and falls back to a userAgent regex + a coarse-
+  // pointer check. Returns { deviceType: 'mobile'|'tablet'|'desktop', os, browser }.
+  function deviceInfo() {
+    var ua = '';    try { ua = navigator.userAgent || ''; } catch (e) {}
+    var uaData = null; try { uaData = navigator.userAgentData || null; } catch (e) {}
+    var coarse = false; try { coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches); } catch (e) {}
+
+    var deviceType;
+    var isTablet = /ipad|tablet|playbook|silk/i.test(ua) || (/android/i.test(ua) && !/mobile/i.test(ua));
+    if (uaData && typeof uaData.mobile === 'boolean') {
+      deviceType = isTablet ? 'tablet' : (uaData.mobile ? 'mobile' : 'desktop');
+    } else if (isTablet || (coarse && /macintosh/i.test(ua))) {
+      deviceType = 'tablet'; // incl. iPadOS, which ships a desktop UA but is touch
+    } else if (/mobile|iphone|ipod|android|blackberry|iemobile|opera mini/i.test(ua)) {
+      deviceType = 'mobile';
+    } else {
+      deviceType = 'desktop';
+    }
+
+    var os = 'Otro';
+    if (uaData && uaData.platform) os = uaData.platform;
+    else if (/windows/i.test(ua)) os = 'Windows';
+    else if (/iphone|ipod|ipad/i.test(ua)) os = 'iOS';
+    else if (/android/i.test(ua)) os = 'Android';
+    else if (/mac os x/i.test(ua)) os = coarse ? 'iPadOS' : 'macOS';
+    else if (/linux/i.test(ua)) os = 'Linux';
+
+    var browser = 'Otro';
+    if (/edg\//i.test(ua)) browser = 'Edge';
+    else if (/opr\/|opera/i.test(ua)) browser = 'Opera';
+    else if (/firefox|fxios/i.test(ua)) browser = 'Firefox';
+    else if (/chrome|crios/i.test(ua)) browser = 'Chrome';
+    else if (/safari/i.test(ua)) browser = 'Safari';
+
+    return { deviceType: deviceType, os: os, browser: browser };
+  }
+
   // One session_started per login per tab — remounts don't double-count.
+  // The event carries device info so the admin can see the login device mix.
   function trackSessionStart(meta) {
     var sess = getSession();
     if (!sess) return;
@@ -66,7 +105,9 @@
       if (sessionStorage.getItem(flag)) return;
       sessionStorage.setItem(flag, '1');
     } catch (e) {}
-    track('session_started', meta);
+    var full = meta || {};
+    try { full = Object.assign({}, deviceInfo(), meta || {}); } catch (e) {}
+    track('session_started', full);
   }
 
   // Called on sign-out so the next sign-in counts as a new session.
@@ -120,6 +161,7 @@
     clearSessionFlags: clearSessionFlags,
     readEvents: readEvents,
     useEvents: useEvents,
+    deviceInfo: deviceInfo,
     EVENTS_KEY: EVENTS_KEY,
   };
 }());

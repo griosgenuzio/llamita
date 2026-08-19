@@ -498,6 +498,15 @@ function AdminApp({ store, session, onSignOut }) {
 
   var effectiveInPeriod = events.filter(function(ev) { return inPeriod(ev) && isEffective(ev); });
 
+  // Device mix at login: aggregate the device tag carried on session_started.
+  var sessionStarts = events.filter(function(ev) { return ev.type === 'session_started' && inPeriod(ev); });
+  var deviceAgg = { mobile: 0, tablet: 0, desktop: 0, desconocido: 0 };
+  sessionStarts.forEach(function(ev) {
+    var d = ev.meta && ev.meta.deviceType;
+    if (d === 'mobile' || d === 'tablet' || d === 'desktop') deviceAgg[d]++;
+    else deviceAgg.desconocido++;
+  });
+
   var drivers = accounts.filter(function(a) { return a.role === 'conductor'; });
   var owners  = accounts.filter(function(a) { return a.role === 'operador'; });
   var approvedLots = lots.filter(function(l) { return l.status === 'approved'; });
@@ -560,6 +569,37 @@ function AdminApp({ store, session, onSignOut }) {
           <AdmStat label={'Usos efectivos (' + (period === 'todos' ? 'total' : period) + ')'} value={effectiveInPeriod.length}
             sub={effectiveInPeriod.filter(function(e){return e.role==='conductor';}).length + ' de conductores · ' + effectiveInPeriod.filter(function(e){return e.role==='operador';}).length + ' de operadores'} />
           <AdmStat label="Eventos registrados" value={events.length} sub="máx. 5000 · los más antiguos rotan" />
+        </div>
+
+        {/* Device mix at login */}
+        <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 12, padding: '12px 16px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Dispositivos de ingreso</h3>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#aaa' }}>
+              {sessionStarts.length} ingreso{sessionStarts.length !== 1 ? 's' : ''}{period !== 'todos' ? (' · ' + (period === 'hoy' ? 'hoy' : '7 días')) : ''}
+            </span>
+          </div>
+          {sessionStarts.length === 0 ? (
+            <div style={{ fontSize: 12, color: '#bbb' }}>Aún no hay ingresos registrados en este periodo.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+              {[['mobile', '📱 Móvil'], ['tablet', '📲 Tablet'], ['desktop', '💻 Escritorio']]
+                .concat(deviceAgg.desconocido ? [['desconocido', '· Desconocido']] : [])
+                .map(function(row) {
+                  var key = row[0], label = row[1], n = deviceAgg[key];
+                  var pct = Math.round(n / sessionStarts.length * 100);
+                  return (
+                    <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ width: 110, fontSize: 12, color: '#555', flexShrink: 0 }}>{label}</div>
+                      <div style={{ flex: 1, height: 8, background: '#f0f0f0', borderRadius: 999, overflow: 'hidden' }}>
+                        <div style={{ width: pct + '%', height: '100%', background: key === 'desconocido' ? '#ccc' : 'var(--c-accent)', borderRadius: 999 }}/>
+                      </div>
+                      <div style={{ width: 66, textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 11, color: '#888', flexShrink: 0 }}>{n} · {pct}%</div>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
         </div>
 
         {/* Verification review queue */}
