@@ -501,11 +501,16 @@ function AdminApp({ store, session, onSignOut }) {
   // Device mix at login: aggregate the device tag carried on session_started.
   var sessionStarts = events.filter(function(ev) { return ev.type === 'session_started' && inPeriod(ev); });
   var deviceAgg = { mobile: 0, tablet: 0, desktop: 0, desconocido: 0 };
+  var osAgg = {};
   sessionStarts.forEach(function(ev) {
     var d = ev.meta && ev.meta.deviceType;
     if (d === 'mobile' || d === 'tablet' || d === 'desktop') deviceAgg[d]++;
     else deviceAgg.desconocido++;
+    var o = (ev.meta && ev.meta.os) || 'Desconocido';
+    osAgg[o] = (osAgg[o] || 0) + 1;
   });
+  var osRows = Object.keys(osAgg).map(function(k) { return [k, osAgg[k]]; })
+    .sort(function(a, b) { return b[1] - a[1]; });
 
   var drivers = accounts.filter(function(a) { return a.role === 'conductor'; });
   var owners  = accounts.filter(function(a) { return a.role === 'operador'; });
@@ -582,23 +587,44 @@ function AdminApp({ store, session, onSignOut }) {
           {sessionStarts.length === 0 ? (
             <div style={{ fontSize: 12, color: '#bbb' }}>Aún no hay ingresos registrados en este periodo.</div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-              {[['mobile', '📱 Móvil'], ['tablet', '📲 Tablet'], ['desktop', '💻 Escritorio']]
-                .concat(deviceAgg.desconocido ? [['desconocido', '· Desconocido']] : [])
-                .map(function(row) {
-                  var key = row[0], label = row[1], n = deviceAgg[key];
-                  var pct = Math.round(n / sessionStarts.length * 100);
-                  return (
-                    <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 110, fontSize: 12, color: '#555', flexShrink: 0 }}>{label}</div>
-                      <div style={{ flex: 1, height: 8, background: '#f0f0f0', borderRadius: 999, overflow: 'hidden' }}>
-                        <div style={{ width: pct + '%', height: '100%', background: key === 'desconocido' ? '#ccc' : 'var(--c-accent)', borderRadius: 999 }}/>
+            <React.Fragment>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                {[['mobile', '📱 Móvil'], ['tablet', '📲 Tablet'], ['desktop', '💻 Escritorio']]
+                  .concat(deviceAgg.desconocido ? [['desconocido', '· Desconocido']] : [])
+                  .map(function(row) {
+                    var key = row[0], label = row[1], n = deviceAgg[key];
+                    var pct = Math.round(n / sessionStarts.length * 100);
+                    return (
+                      <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 110, fontSize: 12, color: '#555', flexShrink: 0 }}>{label}</div>
+                        <div style={{ flex: 1, height: 8, background: '#f0f0f0', borderRadius: 999, overflow: 'hidden' }}>
+                          <div style={{ width: pct + '%', height: '100%', background: key === 'desconocido' ? '#ccc' : 'var(--c-accent)', borderRadius: 999 }}/>
+                        </div>
+                        <div style={{ width: 66, textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 11, color: '#888', flexShrink: 0 }}>{n} · {pct}%</div>
                       </div>
-                      <div style={{ width: 66, textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 11, color: '#888', flexShrink: 0 }}>{n} · {pct}%</div>
-                    </div>
-                  );
-                })}
-            </div>
+                    );
+                  })}
+              </div>
+              <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid #f2f2f2' }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', color: '#aaa', textTransform: 'uppercase', marginBottom: 10 }}>Sistema operativo</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                  {osRows.map(function(row) {
+                    var label = row[0], n = row[1];
+                    var pct = Math.round(n / sessionStarts.length * 100);
+                    var unknown = label === 'Desconocido';
+                    return (
+                      <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 110, fontSize: 12, color: '#555', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
+                        <div style={{ flex: 1, height: 8, background: '#f0f0f0', borderRadius: 999, overflow: 'hidden' }}>
+                          <div style={{ width: pct + '%', height: '100%', background: unknown ? '#ccc' : 'var(--c-accent)', borderRadius: 999 }}/>
+                        </div>
+                        <div style={{ width: 66, textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 11, color: '#888', flexShrink: 0 }}>{n} · {pct}%</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </React.Fragment>
           )}
         </div>
 
