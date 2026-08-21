@@ -7,6 +7,34 @@ const { formatBs, locate, distanceKm, coverLabel, keyReqLabel, keyReqOf, isCover
 const AVAIL = '#32C87A';
 const FULL  = '#E05A4B';
 
+// Drag-the-bottom-sheet-down to dismiss. Only engages when the content is
+// scrolled to the top and the finger moves downward, so it never fights the
+// sheet's own scrolling. Returns a ref (the scroll container), touch handlers,
+// and a live transform style.
+function useDragDismiss(onClose) {
+  const ref = React.useRef(null);
+  const start = React.useRef(null);
+  const dyRef = React.useRef(0);            // live delta (state can lag a fast gesture)
+  const [dy, setDy] = React.useState(0);
+  const onTouchStart = (e) => { start.current = { y: e.touches[0].clientY, scroll: ref.current ? ref.current.scrollTop : 0 }; dyRef.current = 0; };
+  const onTouchMove = (e) => {
+    if (!start.current) return;
+    const d = e.touches[0].clientY - start.current.y;
+    if (d > 0 && start.current.scroll <= 0) { dyRef.current = d; setDy(d); }
+    else if (dyRef.current !== 0) { dyRef.current = 0; setDy(0); }
+  };
+  const onTouchEnd = () => {
+    const close = dyRef.current > 90;
+    dyRef.current = 0; setDy(0); start.current = null;
+    if (close) onClose();
+  };
+  return {
+    ref,
+    handlers: { onTouchStart, onTouchMove, onTouchEnd },
+    dragStyle: { transform: dy ? `translateY(${dy}px)` : undefined, transition: dy ? 'none' : 'transform 0.2s ease' },
+  };
+}
+
 function FilterChip({ active, onClick, children }) {
   return (
     <button onClick={onClick} style={{
@@ -146,6 +174,7 @@ function LotDetailSheet({ lot, onClose, onDirections, route, routeLoading, route
   const isTable = fees.mode === 'table' && Array.isArray(fees.tiers) && fees.tiers.length > 0;
   const tierMin = isTable ? Math.min.apply(null, fees.tiers.map(t => t.price)) : null;
   const [showTariff, setShowTariff] = React.useState(false);
+  const drag = useDragDismiss(onClose);
 
   const rows = [
     { k: 'Cupos libres',      v: `${available} de ${lot.total}` },
@@ -160,7 +189,8 @@ function LotDetailSheet({ lot, onClose, onDirections, route, routeLoading, route
   ];
 
   return (
-    <div style={{
+    <div ref={drag.ref} onTouchStart={drag.handlers.onTouchStart} onTouchMove={drag.handlers.onTouchMove} onTouchEnd={drag.handlers.onTouchEnd}
+      style={Object.assign({
       background: '#fff',
       borderRadius: '18px 18px 0 0',
       boxShadow: '0 -8px 30px rgba(0,0,0,0.14), 0 -1px 0 rgba(0,0,0,0.06)',
@@ -168,8 +198,8 @@ function LotDetailSheet({ lot, onClose, onDirections, route, routeLoading, route
       animation: 'llamita-sheet-up 0.25s ease-out',
       maxHeight: '72vh',
       overflowY: 'auto',
-    }}>
-      {/* drag handle */}
+    }, drag.dragStyle)}>
+      {/* drag handle — tap or swipe down to close */}
       <div onClick={onClose} style={{
         width: 36, height: 4, borderRadius: 2, background: '#e0e0e0',
         margin: '0 auto 14px', cursor: 'pointer',
@@ -273,6 +303,7 @@ function LotDetailSheet({ lot, onClose, onDirections, route, routeLoading, route
 function ReferenceLotSheet({ lot, onClose, onDirections, route, routeLoading, routeError, onClearRoute }) {
   const [sent, setSent] = React.useState(false);
   const [sending, setSending] = React.useState(false);
+  const drag = useDragDismiss(onClose);
 
   function report() {
     setSending(true);
@@ -286,12 +317,13 @@ function ReferenceLotSheet({ lot, onClose, onDirections, route, routeLoading, ro
   }
 
   return (
-    <div style={{
+    <div ref={drag.ref} onTouchStart={drag.handlers.onTouchStart} onTouchMove={drag.handlers.onTouchMove} onTouchEnd={drag.handlers.onTouchEnd}
+      style={Object.assign({
       background: '#fff', borderRadius: '18px 18px 0 0',
       boxShadow: '0 -8px 30px rgba(0,0,0,0.14), 0 -1px 0 rgba(0,0,0,0.06)',
       padding: '10px 18px 32px', animation: 'llamita-sheet-up 0.25s ease-out',
       maxHeight: '72vh', overflowY: 'auto',
-    }}>
+    }, drag.dragStyle)}>
       <div onClick={onClose} style={{ width: 36, height: 4, borderRadius: 2, background: '#e0e0e0', margin: '0 auto 14px', cursor: 'pointer' }}/>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
         <div style={{ flex: 1 }}>

@@ -130,8 +130,10 @@ function LeafletParkingMap({ lots, selectedId, onSelect, filterFn, pulseLotId, u
       preferCanvas: true,
     });
 
+    // Voyager basemap: shows more street names, neighborhood + district labels
+    // and POIs (malls) than light_all — easier for drivers to orient quickly.
     L.tileLayer(
-      'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+      'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
       {
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © CARTO',
         subdomains:  'abcd',

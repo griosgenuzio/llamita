@@ -15,14 +15,22 @@
   // backend's URL. Empty string = same origin (node server/server.js).
   var BASE = (window.LLAMITA_API_BASE || '').replace(/\/$/, '');
 
+  // Stored in localStorage so the session survives closing the tab/browser —
+  // users stay logged in until they explicitly sign out. Migrates any existing
+  // per-tab (sessionStorage) token so current users aren't logged out on deploy.
   function token() {
-    try { return sessionStorage.getItem(TOKEN_KEY); } catch (e) { return null; }
+    try {
+      var t = localStorage.getItem(TOKEN_KEY);
+      if (!t) { t = sessionStorage.getItem(TOKEN_KEY); if (t) localStorage.setItem(TOKEN_KEY, t); }
+      return t;
+    } catch (e) { return null; }
   }
 
   function setToken(t) {
     try {
-      if (t) sessionStorage.setItem(TOKEN_KEY, t);
-      else sessionStorage.removeItem(TOKEN_KEY);
+      if (t) localStorage.setItem(TOKEN_KEY, t);
+      else localStorage.removeItem(TOKEN_KEY);
+      sessionStorage.removeItem(TOKEN_KEY); // migrate away from the old per-tab key
     } catch (e) {}
   }
 

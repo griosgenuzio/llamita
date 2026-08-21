@@ -26,7 +26,10 @@ const getAccounts = () => { try { return JSON.parse(localStorage.getItem(ACCOUNT
 const setAccounts = (a) => { try { localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(a)); } catch (e) {} };
 
 function startSession(user) {
-  try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(user)); } catch (e) {}
+  // localStorage so the session persists across tab/browser closes (users stay
+  // logged in until they sign out).
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify(user)); } catch (e) {}
+  try { sessionStorage.removeItem(SESSION_KEY); } catch (e) {}
   window.dispatchEvent(new Event('llamita-session-change'));
 }
 
@@ -127,13 +130,17 @@ function signOut() {
     }
   } catch (e) {}
   try { window.LlamitaApi.setToken(null); } catch (e) {}
-  try { sessionStorage.removeItem(SESSION_KEY); } catch (e) {}
+  try { localStorage.removeItem(SESSION_KEY); sessionStorage.removeItem(SESSION_KEY); } catch (e) {}
   try { window.LlamitaAnalytics.clearSessionFlags(); } catch (e) {}
   window.dispatchEvent(new Event('llamita-session-change'));
 }
 
 function getSession() {
-  try { return JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null'); } catch (e) { return null; }
+  try {
+    var raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) { raw = sessionStorage.getItem(SESSION_KEY); if (raw) localStorage.setItem(SESSION_KEY, raw); }
+    return JSON.parse(raw || 'null');
+  } catch (e) { return null; }
 }
 
 function useSession() {
@@ -161,24 +168,41 @@ function AField({ label, children, error }) {
 }
 
 function AInput({ value, onChange, type = 'text', placeholder, autoFocus, autoComplete }) {
-  return (
+  const isPassword = type === 'password';
+  const [show, setShow] = React.useState(false);
+  const effType = isPassword ? (show ? 'text' : 'password') : type;
+  const input = (
     <input
-      type={type}
+      type={effType}
       value={value}
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
       autoFocus={autoFocus}
       autoComplete={autoComplete}
       style={{
-        padding: '10px 12px', borderRadius: 8,
+        width: '100%', boxSizing: 'border-box',
+        padding: isPassword ? '10px 58px 10px 12px' : '10px 12px', borderRadius: 8,
         border: '1px solid var(--c-border)', background: 'var(--c-surface)',
-        fontFamily: type === 'email' || type === 'password' ? 'var(--font-mono)' : 'var(--font-sans)',
+        fontFamily: type === 'email' || isPassword ? 'var(--font-mono)' : 'var(--font-sans)',
         fontSize: 13, color: 'var(--c-text)', outline: 'none',
         transition: 'border-color 0.15s',
       }}
       onFocus={e => e.target.style.borderColor = 'var(--c-accent)'}
       onBlur={e => e.target.style.borderColor = 'var(--c-border)'}
     />
+  );
+  if (!isPassword) return input;
+  return (
+    <div style={{ position: 'relative', display: 'flex' }}>
+      {input}
+      <button type="button" onClick={() => setShow(s => !s)}
+        aria-label={show ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+        style={{
+          position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+          background: 'none', border: 'none', cursor: 'pointer', padding: '4px 2px',
+          color: 'var(--c-muted)', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.02em',
+        }}>{show ? 'Ocultar' : 'Ver'}</button>
+    </div>
   );
 }
 
