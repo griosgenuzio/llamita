@@ -21,6 +21,7 @@ var EVENT_LABELS = {
   fees_updated:        'Ajustó tarifas',
   vehicle_checked_in:  'Registró ingreso',
   vehicle_checked_out: 'Cobró salida',
+  sale_deleted:        'Eliminó una venta',
   registry_downloaded: 'Descargó registro',
   user_signed_up:      'Creó cuenta',
   user_signed_in:      'Inició sesión',

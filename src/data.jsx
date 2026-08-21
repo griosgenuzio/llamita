@@ -292,9 +292,21 @@ function useLlamitaStore() {
     pulse(s.lot);
   };
 
+  // Soft-delete a sale: the record is KEPT (marked deleted) so it stays in the
+  // registry as an audit trail, and a `sale_deleted` event is logged with its
+  // details. Totals exclude deleted sales.
+  const deleteSale = (saleId) => {
+    const s = history.find(x => x.id === saleId);
+    setHistory(prev => prev.map(h => h.id === saleId ? { ...h, deleted: true, deletedAt: new Date().toISOString() } : h));
+    track('sale_deleted', s ? {
+      saleId, lotId: s.lot, amount: s.amount, plate: s.plate,
+      date: s.date, entry: s.entry, exit: s.exit, method: s.method,
+    } : { saleId });
+  };
+
   return {
     lots, sessions, history, pulseLotId,
-    updateLot, setOccupied, toggleFull, addLot, deleteLot, checkIn, checkOut,
+    updateLot, setOccupied, toggleFull, addLot, deleteLot, checkIn, checkOut, deleteSale,
   };
 }
 

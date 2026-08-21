@@ -171,6 +171,61 @@ function Toggle({ value, onChange, label }) {
   );
 }
 
+// Modal that re-confirms the user's password before a sensitive action.
+function PasswordConfirm({ title, message, confirmLabel, onConfirmed, onCancel }) {
+  var [pwd, setPwd] = React.useState('');
+  var [busy, setBusy] = React.useState(false);
+  var [err, setErr] = React.useState(null);
+  function go() {
+    if (!pwd || busy) return;
+    setBusy(true); setErr(null);
+    window.LlamitaApi.req('POST', '/api/auth/verify-password', { password: pwd })
+      .then(function() { setBusy(false); onConfirmed(); })
+      .catch(function() { setBusy(false); setErr('Contraseña incorrecta. Intenta de nuevo.'); });
+  }
+  return (
+    <div onClick={onCancel} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 14, padding: 22, maxWidth: 340, width: '100%', boxShadow: '0 10px 40px rgba(0,0,0,0.2)' }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: '#111' }}>{title}</div>
+        {message && <div style={{ fontSize: 12, color: '#777', marginTop: 8, lineHeight: 1.6 }}>{message}</div>}
+        <div style={{ marginTop: 14 }}>
+          <FieldLabel>Confirma tu contraseña</FieldLabel>
+          <input type="password" value={pwd} autoFocus placeholder="Tu contraseña"
+            onChange={function(e) { setPwd(e.target.value); }}
+            onKeyDown={function(e) { if (e.key === 'Enter') go(); }}
+            style={{ width: '100%', boxSizing: 'border-box', border: '1px solid #e5e5e5', borderRadius: 8, padding: '9px 10px', fontFamily: 'var(--font-sans)', fontSize: 13, outline: 'none' }} />
+        </div>
+        {err && <div style={{ color: '#c0392b', fontSize: 12, marginTop: 8 }}>{err}</div>}
+        <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
+          <Btn variant="ghost" onClick={onCancel} fullWidth>Cancelar</Btn>
+          <Btn variant="accent" onClick={go} disabled={busy || !pwd} fullWidth style={{ background: '#E74C3C', borderColor: '#E74C3C' }}>{busy ? 'Verificando…' : (confirmLabel || 'Eliminar')}</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// One tariff-table row. Keeps the typed strings locally so the fields can be
+// cleared and typed freely (no "0" fixed there); commits numbers to the parent.
+function TierRow({ tier, onChange, onRemove }) {
+  var [hStr, setHStr] = React.useState(String(tier.maxMin / 60));
+  var [pStr, setPStr] = React.useState(String(tier.price));
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ fontSize: 11, color: '#888', width: 34, flexShrink: 0 }}>Hasta</span>
+      <div style={{ width: 78, flexShrink: 0 }}>
+        <Input value={hStr} type="number" min="0" step="0.5" mono suffix="h"
+          onChange={function(v) { setHStr(v); onChange({ maxMin: Math.max(1, Math.round((parseFloat(v) || 0) * 60)) }); }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <Input value={pStr} type="number" min="0" mono suffix="Bs"
+          onChange={function(v) { setPStr(v); onChange({ price: parseFloat(v) || 0 }); }} />
+      </div>
+      <button onClick={onRemove} title="Quitar" style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 6, border: '1px solid #f0d2cc', background: '#fff', color: '#c0392b', fontSize: 15, cursor: 'pointer', lineHeight: 1 }}>×</button>
+    </div>
+  );
+}
+
 // Single-choice segmented button group (options: [[value,label], …]).
 function Choice({ options, value, onChange }) {
   return (
@@ -786,20 +841,15 @@ function MapSection({ store, lots, lot, onSelectLot, session, lotEdits, refreshE
           </div>
         )}
 
-        {/* Delete confirmation */}
+        {/* Delete confirmation — requires re-entering the password */}
         {confirmDel && (
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 1300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-            <div style={{ background: '#fff', borderRadius: 14, padding: 22, maxWidth: 320, boxShadow: '0 10px 40px rgba(0,0,0,0.2)' }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#111' }}>¿Eliminar “{confirmDel.name}”?</div>
-              <div style={{ fontSize: 12, color: '#777', marginTop: 8, lineHeight: 1.6 }}>
-                El parqueo se quitará del mapa de los conductores y se borrarán sus fotos. Esta acción no se puede deshacer.
-              </div>
-              <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
-                <Btn variant="ghost" onClick={function() { setConfirmDel(null); }} fullWidth>Cancelar</Btn>
-                <Btn variant="accent" onClick={function() { doDelete(confirmDel.id); }} fullWidth style={{ background: '#E74C3C', borderColor: '#E74C3C' }}>Eliminar</Btn>
-              </div>
-            </div>
-          </div>
+          <PasswordConfirm
+            title={'¿Eliminar “' + confirmDel.name + '”?'}
+            message="El parqueo se quitará del mapa de los conductores y se borrarán sus fotos. Esta acción no se puede deshacer."
+            confirmLabel="Eliminar parqueo"
+            onConfirmed={function() { doDelete(confirmDel.id); }}
+            onCancel={function() { setConfirmDel(null); }}
+          />
         )}
       </div>
 
@@ -1059,7 +1109,8 @@ function OperationsSection({ store, lot, now }) {
 
 function RegistrySection({ store, lot }) {
   var isMobile = useIsMobile();
-  var { history } = store;
+  var { history, deleteSale } = store;
+  var [pendingDel, setPendingDel] = React.useState(null);
   var today = todayStr();
   var yesterday = (function() {
     var d = new Date(); d.setDate(d.getDate()-1);
@@ -1074,26 +1125,28 @@ function RegistrySection({ store, lot }) {
     if (filter === 'ayer') return h.date === yesterday;
     return true;
   });
-  var total    = filtered.reduce(function(s,h) { return s+h.amount; }, 0);
-  var efectivo = filtered.filter(function(h) { return h.method==='Efectivo'; }).reduce(function(s,h) { return s+h.amount; }, 0);
-  var qr       = filtered.filter(function(h) { return h.method==='QR'; }).reduce(function(s,h) { return s+h.amount; }, 0);
+  // Deleted sales stay in the list as an audit trail but never count toward totals.
+  var active   = filtered.filter(function(h) { return !h.deleted; });
+  var total    = active.reduce(function(s,h) { return s+h.amount; }, 0);
+  var efectivo = active.filter(function(h) { return h.method==='Efectivo'; }).reduce(function(s,h) { return s+h.amount; }, 0);
+  var qr       = active.filter(function(h) { return h.method==='QR'; }).reduce(function(s,h) { return s+h.amount; }, 0);
 
   function handleDownload() {
     var rows = [['Fecha','Placa','Lugar','Entrada','Salida','Duracion','Metodo','Monto Bs']].concat(
-      filtered.map(function(h) { return [h.date,h.plate,h.spot,h.entry,h.exit,h.duration,h.method,h.amount]; })
+      active.map(function(h) { return [h.date,h.plate,h.spot,h.entry,h.exit,h.duration,h.method,h.amount]; })
     );
     var name = 'llamita-' + lot.name.replace(/\s+/g,'-').toLowerCase() + '-' + new Date().toISOString().slice(0,10) + '.csv';
     downloadCSV(rows, name);
-    try { window.LlamitaAnalytics.track('registry_downloaded', { lotId: lot.id, rows: filtered.length }); } catch (e) {}
+    try { window.LlamitaAnalytics.track('registry_downloaded', { lotId: lot.id, rows: active.length }); } catch (e) {}
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, height: isMobile ? 'auto' : '100%' }}>
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 12 }}>
-        <StatCard label="Recaudo total" value={formatBs(total)} sub={filtered.length + ' servicios'} accent />
+        <StatCard label="Recaudo total" value={formatBs(total)} sub={active.length + ' servicios'} accent />
         <StatCard label="Efectivo"      value={formatBs(efectivo)} />
         <StatCard label="QR"            value={formatBs(qr)} />
-        <StatCard label="Promedio / vehículo" value={formatBs(filtered.length ? total/filtered.length : 0)} />
+        <StatCard label="Promedio / vehículo" value={formatBs(active.length ? total/active.length : 0)} />
       </div>
 
       <div style={{ flex: isMobile ? 'none' : 1, background: '#fff', border: '1px solid #eee', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -1126,9 +1179,9 @@ function RegistrySection({ store, lot }) {
           <table style={{ width: '100%', minWidth: 520, borderCollapse: 'collapse', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
             <thead style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
               <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                {['Fecha','Placa','Lugar','Entrada','Salida','Duración','Método','Monto'].map(function(h) {
+                {['Fecha','Placa','Lugar','Entrada','Salida','Duración','Método','Monto',''].map(function(h, hi) {
                   return (
-                    <th key={h} style={{
+                    <th key={hi} style={{
                       padding: '8px 14px', textAlign: h==='Monto' ? 'right' : 'left',
                       fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.1em',
                       color: '#aaa', textTransform: 'uppercase', fontWeight: 600,
@@ -1139,19 +1192,26 @@ function RegistrySection({ store, lot }) {
             </thead>
             <tbody>
               {filtered.length === 0 && (
-                <tr><td colSpan="8" style={{ padding: 32, textAlign: 'center', color: '#bbb', fontSize: 12, fontFamily: 'var(--font-sans)' }}>Sin registros para este período</td></tr>
+                <tr><td colSpan="9" style={{ padding: 32, textAlign: 'center', color: '#bbb', fontSize: 12, fontFamily: 'var(--font-sans)' }}>Sin registros para este período</td></tr>
               )}
               {filtered.map(function(h) {
+                var del = !!h.deleted;
+                var muted = del ? '#c9a99f' : null;
                 return (
-                  <tr key={h.id} style={{ borderBottom: '1px solid #f8f8f8' }}>
-                    <td style={{ padding: '9px 14px', color: '#aaa' }}>{h.date}</td>
-                    <td style={{ padding: '9px 14px', fontWeight: 700, color: '#111', letterSpacing: '0.04em' }}>{h.plate}</td>
-                    <td style={{ padding: '9px 14px', color: '#aaa' }}>{h.spot}</td>
-                    <td style={{ padding: '9px 14px', color: '#111' }}>{h.entry}</td>
-                    <td style={{ padding: '9px 14px', color: '#111' }}>{h.exit}</td>
-                    <td style={{ padding: '9px 14px', color: '#111' }}>{h.duration}</td>
-                    <td style={{ padding: '9px 14px', color: '#aaa' }}>{h.method}</td>
-                    <td style={{ padding: '9px 14px', textAlign: 'right', fontWeight: 700, color: 'var(--c-accent)' }}>{formatBs(h.amount)}</td>
+                  <tr key={h.id} style={{ borderBottom: '1px solid #f8f8f8', background: del ? '#fff8f6' : 'transparent' }}>
+                    <td style={{ padding: '9px 14px', color: del ? muted : '#aaa' }}>{h.date}</td>
+                    <td style={{ padding: '9px 14px', fontWeight: 700, color: del ? muted : '#111', letterSpacing: '0.04em', textDecoration: del ? 'line-through' : 'none' }}>{h.plate}</td>
+                    <td style={{ padding: '9px 14px', color: del ? muted : '#aaa' }}>{h.spot}</td>
+                    <td style={{ padding: '9px 14px', color: del ? muted : '#111' }}>{h.entry}</td>
+                    <td style={{ padding: '9px 14px', color: del ? muted : '#111' }}>{h.exit}</td>
+                    <td style={{ padding: '9px 14px', color: del ? muted : '#111' }}>{h.duration}</td>
+                    <td style={{ padding: '9px 14px', color: del ? muted : '#aaa' }}>{h.method}</td>
+                    <td style={{ padding: '9px 14px', textAlign: 'right', fontWeight: 700, color: del ? muted : 'var(--c-accent)', textDecoration: del ? 'line-through' : 'none' }}>{formatBs(h.amount)}</td>
+                    <td style={{ padding: '9px 14px', textAlign: 'right' }}>
+                      {del
+                        ? <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, color: '#c0392b', background: 'rgba(231,76,60,0.10)', padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>ELIMINADA</span>
+                        : <button onClick={function() { setPendingDel(h); }} title="Eliminar venta" style={{ border: '1px solid #f0d2cc', background: '#fff', color: '#c0392b', borderRadius: 6, width: 24, height: 24, cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>×</button>}
+                    </td>
                   </tr>
                 );
               })}
@@ -1159,6 +1219,16 @@ function RegistrySection({ store, lot }) {
           </table>
         </div>
       </div>
+
+      {pendingDel && (
+        <PasswordConfirm
+          title="¿Eliminar esta venta?"
+          message={'Se registrará la eliminación (placa ' + pendingDel.plate + ', ' + formatBs(pendingDel.amount) + ', ' + pendingDel.date + '). La venta quedará marcada como ELIMINADA en el registro y no contará en los totales.'}
+          confirmLabel="Eliminar venta"
+          onConfirmed={function() { deleteSale(pendingDel.id); setPendingDel(null); }}
+          onCancel={function() { setPendingDel(null); }}
+        />
+      )}
     </div>
   );
 }
@@ -1173,10 +1243,14 @@ function FeesSection({ store, lot }) {
   var tiers = (f.tiers && f.tiers.length) ? f.tiers : [];
   var set = function(patch) { updateLot(lot.id, { fees: Object.assign({}, f, patch) }); };
 
+  // Bumped when the tier set is replaced wholesale (template / mode switch) so
+  // the rows remount and re-seed their local strings; untouched during typing.
+  var [tierSeed, setTierSeed] = React.useState(0);
   function switchMode(m) {
-    if (m === 'table') set({ mode: 'table', tiers: (f.tiers && f.tiers.length) ? f.tiers : STD_TIERS });
+    if (m === 'table') { set({ mode: 'table', tiers: (f.tiers && f.tiers.length) ? f.tiers : STD_TIERS }); setTierSeed(function(k) { return k + 1; }); }
     else set({ mode: 'formula' });
   }
+  function useTemplate() { set({ tiers: STD_TIERS }); setTierSeed(function(k) { return k + 1; }); }
   function setTier(i, patch) { var t = tiers.slice(); t[i] = Object.assign({}, t[i], patch); set({ tiers: t }); }
   function removeTier(i) { set({ tiers: tiers.filter(function(_, j) { return j !== i; }) }); }
   function addTier() { var last = tiers[tiers.length - 1] || { maxMin: 0, price: 0 }; set({ tiers: tiers.concat([{ maxMin: last.maxMin + 60, price: last.price }]) }); }
@@ -1229,18 +1303,11 @@ function FeesSection({ store, lot }) {
           <React.Fragment>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <div style={{ fontSize: 12, color: '#666' }}>Precio según el tiempo de estadía</div>
-              <button onClick={function() { set({ tiers: STD_TIERS }); }} style={{ padding: '5px 10px', borderRadius: 7, border: '1px solid #ddd', background: '#fff', fontSize: 11, color: '#444', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>Usar plantilla</button>
+              <button onClick={useTemplate} style={{ padding: '5px 10px', borderRadius: 7, border: '1px solid #ddd', background: '#fff', fontSize: 11, color: '#444', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>Usar plantilla</button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
               {tiers.map(function(t, i) {
-                return (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 11, color: '#888', width: 34, flexShrink: 0 }}>Hasta</span>
-                    <div style={{ width: 78, flexShrink: 0 }}><Input value={t.maxMin / 60} onChange={function(v) { setTier(i, { maxMin: Math.max(1, Math.round((parseFloat(v) || 0) * 60)) }); }} type="number" min="0" step="0.5" mono suffix="h" /></div>
-                    <div style={{ flex: 1, minWidth: 0 }}><Input value={t.price} onChange={function(v) { setTier(i, { price: parseFloat(v) || 0 }); }} type="number" min="0" mono suffix="Bs" /></div>
-                    <button onClick={function() { removeTier(i); }} title="Quitar" style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 6, border: '1px solid #f0d2cc', background: '#fff', color: '#c0392b', fontSize: 15, cursor: 'pointer', lineHeight: 1 }}>×</button>
-                  </div>
-                );
+                return <TierRow key={tierSeed + '-' + i} tier={t} onChange={function(patch) { setTier(i, patch); }} onRemove={function() { removeTier(i); }} />;
               })}
               <button onClick={addTier} style={{ marginTop: 2, padding: '7px 0', borderRadius: 7, border: '1px dashed #ccc', background: '#fff', fontSize: 12, color: '#666', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>+ Agregar tramo</button>
             </div>

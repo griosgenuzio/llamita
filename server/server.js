@@ -681,6 +681,24 @@ async function handleApi(req, res, pathname) {
     return json(res, 200, { user: publicUser(row), token: issueToken(row.id, row.role) });
   }
 
+  // Re-confirm the caller's password (for sensitive actions like deleting a lot
+  // or a sale). Handles both the admin credential and regular users.
+  if (pathname === '/api/auth/verify-password' && method === 'POST') {
+    const who = authFrom(req);
+    if (!who) return json(res, 401, { error: 'unauthorized' });
+    const b = await readBody(req);
+    const pwd = String(b.password || '');
+    let ok;
+    if (who.id === 'admin') {
+      ok = pwd === ADMIN_PASSWORD;
+    } else {
+      const u = db.prepare('SELECT password_hash, password_salt FROM users WHERE id = ?').get(who.id);
+      if (!u) return json(res, 404, { error: 'not_found' });
+      ok = hashPassword(pwd, u.password_salt) === u.password_hash;
+    }
+    return json(res, ok ? 200 : 401, ok ? { ok: true } : { error: 'invalid_password' });
+  }
+
   if (pathname === '/api/auth/signout' && method === 'POST') {
     const h = req.headers['authorization'] || '';
     const m = /^Bearer\s+(.+)$/i.exec(h);
