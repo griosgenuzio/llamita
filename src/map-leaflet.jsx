@@ -21,6 +21,10 @@
     // Driver's own-location triangle: a bare divIcon (Leaflet otherwise gives
     // divIcons a white box background + border).
     '.llamita-me{background:transparent!important;border:none!important}' +
+    // Boost contrast/saturation of the (pale Voyager) tiles on the DRIVER map so
+    // streets stand out from blocks/land when zoomed out. Only tiles are
+    // filtered — markers/labels live in other panes and stay crisp.
+    '.llamita-driver-map .leaflet-tile-pane{filter:saturate(1.5) contrast(1.18) brightness(0.96)!important}' +
     // Attribution kept for OSM/CARTO terms, but muted: monochrome grey, no blue
     // links, and the coloured Leaflet flag hidden.
     '.leaflet-control-attribution{font-size:9px!important;background:rgba(255,255,255,0.55)!important;padding:0 5px!important}' +
@@ -275,7 +279,7 @@ function LeafletParkingMap({ lots, selectedId, onSelect, filterFn, pulseLotId, u
     try { map.fitBounds(line.getBounds(), { padding: [60, 60], maxZoom: 16 }); } catch (e) {}
   }, [route]);
 
-  return <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} />;
+  return <div ref={containerRef} className="llamita-driver-map" style={{ position: 'absolute', inset: 0 }} />;
 }
 
 window.LlamitaLeafletMap = { LeafletParkingMap };
