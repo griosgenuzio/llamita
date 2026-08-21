@@ -24,7 +24,7 @@
     // Boost contrast/saturation of the (pale Voyager) tiles on the DRIVER map so
     // streets stand out from blocks/land when zoomed out. Only tiles are
     // filtered — markers/labels live in other panes and stay crisp.
-    '.llamita-driver-map .leaflet-tile-pane{filter:grayscale(1) contrast(1.06) brightness(1.02)!important}' +
+    '.llamita-driver-map .leaflet-tile-pane{filter:saturate(0.5) contrast(1.12) brightness(0.8)!important}' +
     // Attribution kept for OSM/CARTO terms, but muted: monochrome grey, no blue
     // links, and the coloured Leaflet flag hidden.
     '.leaflet-control-attribution{font-size:9px!important;background:rgba(255,255,255,0.55)!important;padding:0 5px!important}' +
@@ -134,15 +134,15 @@ function LeafletParkingMap({ lots, selectedId, onSelect, filterFn, pulseLotId, u
       preferCanvas: true,
     });
 
-    // OpenStreetMap standard: roads are drawn with real dark casing (unlike the
-    // pale CARTO styles), so — desaturated by the tile-pane filter below — the
-    // street network reads as clear dark-gray lines on a light map.
+    // Voyager basemap: clean and sparse (neighborhood / mall / main-street
+    // labels, little clutter). The tile-pane filter below darkens + mutes the
+    // land polygons so the lighter roads read as clear lines against them.
     L.tileLayer(
-      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
       {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        subdomains:  'abc',
-        maxZoom:     19,
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © CARTO',
+        subdomains:  'abcd',
+        maxZoom:     20,
       }
     ).addTo(map);
 
