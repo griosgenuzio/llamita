@@ -1,7 +1,12 @@
 // owner.jsx — Owner dashboard
 // window.LlamitaOwner = { OwnerApp }
 
-const { formatBs, parseHM, fmtDuration, calcPrice, useIsMobile, locate } = window.LlamitaData;
+const { formatBs, parseHM, fmtDuration, calcPrice, useIsMobile, locate, coverOf, keyReqOf } = window.LlamitaData;
+
+// Number-field helpers: keep the raw typed string in state (so the box can be
+// cleared and typed freely), and coerce only when saving.
+function toInt(v, min, max) { var n = parseInt(v, 10); if (isNaN(n)) n = min; return Math.max(min, Math.min(max, n)); }
+function toNum(v) { var n = parseFloat(v); return isNaN(n) ? 0 : n; }
 
 // Small "usar mi ubicación actual" button, reused by the create flow (desktop
 // drawer + mobile placement overlay). Calls onLocated({lat,lng}) on success.
@@ -162,6 +167,25 @@ function Toggle({ value, onChange, label }) {
   );
 }
 
+// Single-choice segmented button group (options: [[value,label], …]).
+function Choice({ options, value, onChange }) {
+  return (
+    <div style={{ display: 'flex', gap: 6 }}>
+      {options.map(function(o) {
+        var val = o[0], label = o[1], sel = value === val;
+        return (
+          <button key={val} type="button" onClick={function() { if (onChange) onChange(val); }} style={{
+            flex: 1, padding: '7px 4px', borderRadius: 8, fontSize: 11,
+            border: '1px solid ' + (sel ? 'var(--c-accent)' : '#ddd'),
+            background: sel ? 'rgba(163,230,53,0.08)' : '#fff',
+            color: sel ? 'var(--c-accent)' : '#666', cursor: 'pointer', fontFamily: 'var(--font-sans)',
+          }}>{label}</button>
+        );
+      })}
+    </div>
+  );
+}
+
 function MultiChip({ options, value, onChange }) {
   return (
     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -303,11 +327,16 @@ function OwnerLeafletMap({ lots, selectedId, onSelectLot, placingMode, onPlace, 
 
 var DEFAULT_LOT_FORM = {
   name: '', address: '', total: 20,
-  terrain: 'pavimentado', covered: false, keyRequired: false,
+  terrain: 'pavimentado', covered: 'descubierto', keyRequired: 'no',
   security: [], hours: '07:00 – 22:00',
   payment: ['Efectivo'],
   firstHour: 5, addHour: 3, dailyCap: 40,
 };
+
+var SECURITY_OPTIONS = ['Cámaras', 'Guardia', 'Iluminación', 'Portón', 'Vigilancia 24h', 'Personal'];
+var TERRAIN_OPTIONS = ['pavimentado', 'gravilla', 'tierra', 'adoquín'];
+var COVER_CHOICES = [['descubierto', 'Descubierto'], ['techado', 'Techado'], ['mixto', 'Mixto']];
+var KEY_CHOICES = [['no', 'No'], ['opcional', 'Opcional'], ['obligatoria', 'Obligatoria']];
 
 function CreateLotDrawer({ pendingLatLng, onSave, onCancel, onChange }) {
   var isMobile = useIsMobile();
@@ -373,13 +402,13 @@ function CreateLotDrawer({ pendingLatLng, onSave, onCancel, onChange }) {
             </div>
             <div>
               <FieldLabel>Capacidad total (espacios)</FieldLabel>
-              <Input value={form.total} onChange={function(v) { set({ total: parseInt(v) || 1 }); }} type="number" min="1" mono suffix="esp." />
+              <Input value={form.total} onChange={function(v) { set({ total: v }); }} type="number" min="1" max="1000" mono suffix="esp." />
             </div>
 
             <div>
               <FieldLabel>Tipo de terreno</FieldLabel>
               <div style={{ display: 'flex', gap: 6 }}>
-                {['pavimentado','gravilla','tierra'].map(function(t) {
+                {TERRAIN_OPTIONS.map(function(t) {
                   return (
                     <button key={t} onClick={function() { set({ terrain: t }); }} style={{
                       flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 11,
@@ -394,13 +423,13 @@ function CreateLotDrawer({ pendingLatLng, onSave, onCancel, onChange }) {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 0', borderTop: '1px solid #f5f5f5', borderBottom: '1px solid #f5f5f5' }}>
-              <Toggle value={form.covered}     onChange={function(v) { set({ covered: v }); }}     label="Cubierto" />
-              <Toggle value={form.keyRequired} onChange={function(v) { set({ keyRequired: v }); }} label="Entrega de llave obligatoria" />
+              <div><FieldLabel>Techo</FieldLabel><Choice options={COVER_CHOICES} value={coverOf(form)} onChange={function(v) { set({ covered: v }); }} /></div>
+              <div><FieldLabel>Entrega de llave</FieldLabel><Choice options={KEY_CHOICES} value={keyReqOf(form)} onChange={function(v) { set({ keyRequired: v }); }} /></div>
             </div>
 
             <div>
               <FieldLabel>Seguridad</FieldLabel>
-              <MultiChip options={['Cámaras','Guardia']} value={form.security} onChange={function(v) { set({ security: v }); }} />
+              <MultiChip options={SECURITY_OPTIONS} value={form.security} onChange={function(v) { set({ security: v }); }} />
             </div>
             <div>
               <FieldLabel>Horario</FieldLabel>
@@ -425,15 +454,15 @@ function CreateLotDrawer({ pendingLatLng, onSave, onCancel, onChange }) {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                 <div>
                   <FieldLabel>1ª hora</FieldLabel>
-                  <Input value={form.firstHour} onChange={function(v) { set({ firstHour: parseFloat(v) || 0 }); }} type="number" min="0" step="0.5" mono suffix="Bs" />
+                  <Input value={form.firstHour} onChange={function(v) { set({ firstHour: v }); }} type="number" min="0" step="0.5" mono suffix="Bs" />
                 </div>
                 <div>
                   <FieldLabel>Hora adic.</FieldLabel>
-                  <Input value={form.addHour} onChange={function(v) { set({ addHour: parseFloat(v) || 0 }); }} type="number" min="0" step="0.5" mono suffix="Bs" />
+                  <Input value={form.addHour} onChange={function(v) { set({ addHour: v }); }} type="number" min="0" step="0.5" mono suffix="Bs" />
                 </div>
                 <div>
                   <FieldLabel>Tope diario</FieldLabel>
-                  <Input value={form.dailyCap} onChange={function(v) { set({ dailyCap: parseFloat(v) || 0 }); }} type="number" min="0" mono suffix="Bs" />
+                  <Input value={form.dailyCap} onChange={function(v) { set({ dailyCap: v }); }} type="number" min="0" mono suffix="Bs" />
                 </div>
               </div>
             </div>
@@ -444,7 +473,7 @@ function CreateLotDrawer({ pendingLatLng, onSave, onCancel, onChange }) {
       {step === 'form' && (
         <div style={{ padding: '12px 16px', borderTop: '1px solid #f0f0f0', display: 'flex', gap: 8 }}>
           <Btn variant="ghost" onClick={onCancel} fullWidth>Cancelar</Btn>
-          <Btn variant="accent" onClick={function() { onSave(Object.assign({}, form, { photoIds: photoIds })); }} disabled={!canSave} fullWidth>
+          <Btn variant="accent" onClick={function() { onSave(Object.assign({}, form, { total: toInt(form.total, 1, 1000), firstHour: toNum(form.firstHour), addHour: toNum(form.addHour), dailyCap: toNum(form.dailyCap), photoIds: photoIds })); }} disabled={!canSave} fullWidth>
             Enviar a revisión
           </Btn>
         </div>
@@ -459,7 +488,7 @@ function EditLotDrawer({ lot, onSubmit, onCancel }) {
   var isMobile = useIsMobile();
   var [form, setForm] = React.useState({
     name: lot.name || '', address: lot.address || '', total: lot.total || 1,
-    terrain: lot.terrain || 'pavimentado', covered: !!lot.covered, keyRequired: !!lot.keyRequired,
+    terrain: lot.terrain || 'pavimentado', covered: coverOf(lot), keyRequired: keyReqOf(lot),
     security: lot.security || [], hours: lot.hours || '',
   });
   var [photoIds, setPhotoIds] = React.useState([]);
@@ -468,17 +497,21 @@ function EditLotDrawer({ lot, onSubmit, onCancel }) {
   var [saving, setSaving] = React.useState(false);
   var set = function(patch) { setForm(function(f) { return Object.assign({}, f, patch); }); };
 
-  // Only the fields that actually changed are sent as the proposed edit.
+  // Only the fields that actually changed are sent as the proposed edit. `total`
+  // is coerced to an int; `covered`/`keyRequired` are compared via the
+  // normalizers so a legacy boolean lot isn't falsely flagged as changed.
   var changes = (function() {
     var c = {};
-    ['name', 'address', 'total', 'terrain', 'covered', 'keyRequired', 'hours'].forEach(function(k) {
-      if (form[k] !== lot[k]) c[k] = form[k];
-    });
+    ['name', 'address', 'hours'].forEach(function(k) { if (form[k] !== lot[k]) c[k] = form[k]; });
+    if (form.terrain !== lot.terrain) c.terrain = form.terrain;
+    var t = toInt(form.total, 1, 1000); if (t !== lot.total) c.total = t;
+    if (form.covered !== coverOf(lot)) c.covered = form.covered;
+    if (form.keyRequired !== keyReqOf(lot)) c.keyRequired = form.keyRequired;
     if (JSON.stringify(form.security || []) !== JSON.stringify(lot.security || [])) c.security = form.security;
     return c;
   })();
   var hasChanges = Object.keys(changes).length > 0;
-  var canSubmit = form.name.trim() && form.address.trim() && form.total >= 1 && photoIds.length >= 3 && hasChanges && !saving;
+  var canSubmit = form.name.trim() && form.address.trim() && toInt(form.total, 1, 1000) >= 1 && photoIds.length >= 3 && hasChanges && !saving;
 
   function submit() {
     setSaving(true); setErr(null);
@@ -503,11 +536,11 @@ function EditLotDrawer({ lot, onSubmit, onCancel }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div><FieldLabel>Nombre del parqueo *</FieldLabel><Input value={form.name} onChange={function(v) { set({ name: v }); }} /></div>
           <div><FieldLabel>Dirección *</FieldLabel><Input value={form.address} onChange={function(v) { set({ address: v }); }} /></div>
-          <div><FieldLabel>Capacidad total (espacios)</FieldLabel><Input value={form.total} onChange={function(v) { set({ total: parseInt(v) || 1 }); }} type="number" min="1" mono suffix="esp." /></div>
+          <div><FieldLabel>Capacidad total (espacios)</FieldLabel><Input value={form.total} onChange={function(v) { set({ total: v }); }} type="number" min="1" max="1000" mono suffix="esp." /></div>
           <div>
             <FieldLabel>Tipo de terreno</FieldLabel>
             <div style={{ display: 'flex', gap: 6 }}>
-              {['pavimentado', 'gravilla', 'tierra'].map(function(t) {
+              {TERRAIN_OPTIONS.map(function(t) {
                 return (
                   <button key={t} onClick={function() { set({ terrain: t }); }} style={{
                     flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 11,
@@ -520,10 +553,10 @@ function EditLotDrawer({ lot, onSubmit, onCancel }) {
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 0', borderTop: '1px solid #f5f5f5', borderBottom: '1px solid #f5f5f5' }}>
-            <Toggle value={form.covered} onChange={function(v) { set({ covered: v }); }} label="Cubierto" />
-            <Toggle value={form.keyRequired} onChange={function(v) { set({ keyRequired: v }); }} label="Entrega de llave obligatoria" />
+            <div><FieldLabel>Techo</FieldLabel><Choice options={COVER_CHOICES} value={coverOf(form)} onChange={function(v) { set({ covered: v }); }} /></div>
+            <div><FieldLabel>Entrega de llave</FieldLabel><Choice options={KEY_CHOICES} value={keyReqOf(form)} onChange={function(v) { set({ keyRequired: v }); }} /></div>
           </div>
-          <div><FieldLabel>Seguridad</FieldLabel><MultiChip options={['Cámaras', 'Guardia']} value={form.security} onChange={function(v) { set({ security: v }); }} /></div>
+          <div><FieldLabel>Seguridad</FieldLabel><MultiChip options={SECURITY_OPTIONS} value={form.security} onChange={function(v) { set({ security: v }); }} /></div>
           <div><FieldLabel>Horario</FieldLabel><Input value={form.hours} onChange={function(v) { set({ hours: v }); }} /></div>
           <div style={{ paddingTop: 10, borderTop: '1px solid #f5f5f5' }}>
             <div style={{ fontWeight: 600, fontSize: 12, color: '#111', marginBottom: 4 }}>Fotos de respaldo *</div>

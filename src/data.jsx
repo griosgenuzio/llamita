@@ -34,6 +34,25 @@ function calcPrice(entry, exit, fees, isWeekend = false, isPeak = false) {
   return { mins, amount: Math.round(amount * 100) / 100 };
 }
 
+// ── Lot attribute normalizers ──
+// Old lots stored `covered`/`keyRequired` as booleans; new lots use enums. These
+// read both shapes so nothing breaks and no migration is needed.
+function coverOf(lot) {
+  const c = lot && lot.covered;
+  if (c === true) return 'techado';
+  if (c === 'techado' || c === 'mixto' || c === 'descubierto') return c;
+  return 'descubierto'; // false / null / undefined
+}
+function isCovered(lot) { const c = coverOf(lot); return c === 'techado' || c === 'mixto'; }
+function coverLabel(lot) { return { descubierto: 'Descubierto', techado: 'Techado', mixto: 'Mixto' }[coverOf(lot)]; }
+function keyReqOf(lot) {
+  const k = lot && lot.keyRequired;
+  if (k === true) return 'obligatoria';
+  if (k === 'obligatoria' || k === 'opcional' || k === 'no') return k;
+  return 'no';
+}
+function keyReqLabel(lot) { return { no: 'No requerida', opcional: 'Opcional', obligatoria: 'Obligatoria' }[keyReqOf(lot)]; }
+
 // Collision-proof ids (Date.now alone can collide across tabs).
 const uid = (prefix) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
@@ -308,4 +327,5 @@ window.LlamitaData = {
   useLlamitaStore, useIsMobile,
   formatBs, parseHM, fmtDuration, calcPrice,
   locate, distanceKm,
+  coverOf, isCovered, coverLabel, keyReqOf, keyReqLabel,
 };

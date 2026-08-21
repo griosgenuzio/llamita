@@ -726,20 +726,27 @@ async function handleApi(req, res, pathname) {
     return json(res, 201, { id, bytes: buf.length });
   }
 
-  // Serve an uploaded image — auth-gated (ID docs are private PII).
+  // Serve an uploaded image. Lot photos are public (drivers see them on the
+  // map); ID docs / selfies / business docs stay auth-gated (private PII).
   if (pathname.startsWith('/api/uploads/') && method === 'GET') {
-    const who = authFrom(req);
-    if (!who) return json(res, 401, { error: 'unauthorized' });
     const upId = pathname.slice('/api/uploads/'.length);
     if (!/^[a-z0-9-]+$/i.test(upId)) return json(res, 400, { error: 'bad_id' });
     const row = db.prepare('SELECT * FROM uploads WHERE id = ?').get(upId);
     if (!row) return json(res, 404, { error: 'not_found' });
-    if (who.role !== 'admin' && row.owner_id !== who.id) return json(res, 403, { error: 'forbidden' });
+    const isPublic = row.purpose === 'lot_photo';
+    if (!isPublic) {
+      const who = authFrom(req);
+      if (!who) return json(res, 401, { error: 'unauthorized' });
+      if (who.role !== 'admin' && row.owner_id !== who.id) return json(res, 403, { error: 'forbidden' });
+    }
     const file = path.join(UPLOAD_DIR, `${row.id}.${row.ext}`);
     if (!file.startsWith(UPLOAD_DIR)) return json(res, 403, { error: 'forbidden' });
     let data;
     try { data = fs.readFileSync(file); } catch (e) { return json(res, 404, { error: 'not_found' }); }
-    res.writeHead(200, { 'Content-Type': row.mime, 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'private, max-age=300' });
+    res.writeHead(200, {
+      'Content-Type': row.mime, 'Access-Control-Allow-Origin': '*',
+      'Cache-Control': isPublic ? 'public, max-age=3600' : 'private, max-age=300',
+    });
     res.end(data);
     return;
   }

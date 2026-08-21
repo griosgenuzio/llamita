@@ -58,6 +58,12 @@
       });
   }
 
+  // Direct URL for a PUBLIC upload (lot photos), usable straight as <img src>
+  // with no auth header — the server serves purpose:'lot_photo' unauthenticated.
+  function publicUploadUrl(id) {
+    return BASE + '/api/uploads/' + encodeURIComponent(id);
+  }
+
   // Fetches a private upload with the auth header and returns an object URL
   // (usable as <img src>). Caller should revoke it when done.
   function uploadUrl(id) {
@@ -114,6 +120,7 @@
     req: req,
     upload: upload,
     uploadUrl: uploadUrl,
+    publicUploadUrl: publicUploadUrl,
     token: token,
     setToken: setToken,
     errorMessage: errorMessage,

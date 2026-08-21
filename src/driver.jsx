@@ -2,7 +2,7 @@
 // window.LlamitaDriver = { DriverApp }
 
 const { LeafletParkingMap } = window.LlamitaLeafletMap;
-const { formatBs, locate, distanceKm } = window.LlamitaData;
+const { formatBs, locate, distanceKm, coverLabel, keyReqLabel, isCovered } = window.LlamitaData;
 
 const AVAIL = '#32C87A';
 const FULL  = '#E05A4B';
@@ -130,8 +130,8 @@ function LotDetailSheet({ lot, onClose, onDirections, route, routeLoading, route
   const rows = [
     { k: 'Cupos libres',      v: `${available} de ${lot.total}` },
     { k: 'Terreno',           v: lot.terrain.charAt(0).toUpperCase() + lot.terrain.slice(1) },
-    { k: 'Cubierto',          v: lot.covered ? 'Sí' : 'No' },
-    { k: 'Entrega de llave',  v: lot.keyRequired ? 'Obligatoria' : 'No requerida' },
+    { k: 'Techo',             v: coverLabel(lot) },
+    { k: 'Entrega de llave',  v: keyReqLabel(lot) },
     { k: 'Seguridad',         v: lot.security.join(' · ') || '—' },
     { k: 'Horario',           v: lot.hours },
     { k: 'Métodos de pago',   v: lot.payment.join(' · ') },
@@ -173,6 +173,16 @@ function LotDetailSheet({ lot, onClose, onDirections, route, routeLoading, route
           {full ? '● LLENO' : `● ${available} libre${available !== 1 ? 's' : ''}`}
         </div>
       </div>
+
+      {/* photos uploaded by the operator */}
+      {lot.photoIds && lot.photoIds.length > 0 && (
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 14, paddingBottom: 2, WebkitOverflowScrolling: 'touch' }}>
+          {lot.photoIds.map((id) => (
+            <img key={id} src={window.LlamitaApi.publicUploadUrl(id)} alt={lot.name} loading="lazy"
+              style={{ height: 130, width: 'auto', borderRadius: 10, objectFit: 'cover', flexShrink: 0, border: '1px solid #eee' }} />
+          ))}
+        </div>
+      )}
 
       {/* info rows */}
       <div style={{
@@ -363,7 +373,7 @@ function DriverApp({ store, session, onSignOut }) {
 
   const filterFn = React.useCallback((l) => {
     if (filters.available && l.occupied >= l.total) return false;
-    if (filters.covered && !l.covered) return false;
+    if (filters.covered && !isCovered(l)) return false;
     if (filters.key && !l.keyRequired) return false;
     return true;
   }, [filters]);
