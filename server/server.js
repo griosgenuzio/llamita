@@ -72,7 +72,7 @@ const UPLOAD_PURPOSES = ['id_front', 'id_back', 'selfie', 'business', 'lot_photo
 const MIN_LOT_PHOTOS = 3;
 // Listing-identity fields — an operator may only change these on an existing
 // lot through the admin-reviewed edit flow, never by pushing state directly.
-const GATED_LOT_FIELDS = ['name', 'address', 'lat', 'lng', 'total', 'terrain', 'covered', 'keyRequired', 'security', 'hours'];
+const GATED_LOT_FIELDS = ['name', 'address', 'lat', 'lng', 'total', 'terrain', 'covered', 'keyRequired', 'security', 'hours', 'hoursWeek', 'hoursWeekend'];
 // Operational fields an operator may change live (no review): occupancy + price.
 const OPERATIONAL_LOT_FIELDS = ['occupied', 'fees', 'payment'];
 // One-time data wipe: set LLAMITA_RESET_DATA to a unique token to erase all

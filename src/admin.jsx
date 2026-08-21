@@ -178,7 +178,8 @@ function reviewEdit(id, action, reason) {
 // Human-readable labels + formatting for edited listing fields.
 var EDIT_FIELD_LABELS = {
   name: 'Nombre', address: 'Dirección', total: 'Capacidad', terrain: 'Terreno',
-  covered: 'Cubierto', keyRequired: 'Entrega de llave', security: 'Seguridad', hours: 'Horario',
+  covered: 'Techo', keyRequired: 'Entrega de llave', security: 'Seguridad', hours: 'Horario',
+  hoursWeek: 'Horario (Lun–Vie)', hoursWeekend: 'Horario (fines/feriados)',
   lat: 'Latitud', lng: 'Longitud',
 };
 function fmtEditVal(v) {

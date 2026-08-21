@@ -53,6 +53,14 @@ function keyReqOf(lot) {
 }
 function keyReqLabel(lot) { return { no: 'No requerida', opcional: 'Opcional', obligatoria: 'Obligatoria' }[keyReqOf(lot)]; }
 
+// Schedules: new lots store weekday + weekend/holiday hours; old lots have a
+// single `hours` string that we fall back to for both.
+function hoursOf(lot) {
+  const wk = (lot && lot.hoursWeek) || (lot && lot.hours) || '';
+  const we = (lot && lot.hoursWeekend) || (lot && lot.hours) || '';
+  return { week: wk, weekend: we };
+}
+
 // Collision-proof ids (Date.now alone can collide across tabs).
 const uid = (prefix) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
@@ -327,5 +335,5 @@ window.LlamitaData = {
   useLlamitaStore, useIsMobile,
   formatBs, parseHM, fmtDuration, calcPrice,
   locate, distanceKm,
-  coverOf, isCovered, coverLabel, keyReqOf, keyReqLabel,
+  coverOf, isCovered, coverLabel, keyReqOf, keyReqLabel, hoursOf,
 };

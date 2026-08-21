@@ -2,7 +2,7 @@
 // window.LlamitaDriver = { DriverApp }
 
 const { LeafletParkingMap } = window.LlamitaLeafletMap;
-const { formatBs, locate, distanceKm, coverLabel, keyReqLabel, isCovered } = window.LlamitaData;
+const { formatBs, locate, distanceKm, coverLabel, keyReqLabel, isCovered, hoursOf } = window.LlamitaData;
 
 const AVAIL = '#32C87A';
 const FULL  = '#E05A4B';
@@ -133,7 +133,8 @@ function LotDetailSheet({ lot, onClose, onDirections, route, routeLoading, route
     { k: 'Techo',             v: coverLabel(lot) },
     { k: 'Entrega de llave',  v: keyReqLabel(lot) },
     { k: 'Seguridad',         v: lot.security.join(' · ') || '—' },
-    { k: 'Horario',           v: lot.hours },
+    { k: 'Lun – Vie',         v: hoursOf(lot).week || '—' },
+    { k: 'Fines y feriados',  v: hoursOf(lot).weekend || '—' },
     { k: 'Métodos de pago',   v: lot.payment.join(' · ') },
   ];
 

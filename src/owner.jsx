@@ -1,7 +1,7 @@
 // owner.jsx — Owner dashboard
 // window.LlamitaOwner = { OwnerApp }
 
-const { formatBs, parseHM, fmtDuration, calcPrice, useIsMobile, locate, coverOf, keyReqOf } = window.LlamitaData;
+const { formatBs, parseHM, fmtDuration, calcPrice, useIsMobile, locate, coverOf, keyReqOf, hoursOf } = window.LlamitaData;
 
 // Number-field helpers: keep the raw typed string in state (so the box can be
 // cleared and typed freely), and coerce only when saving.
@@ -328,7 +328,7 @@ function OwnerLeafletMap({ lots, selectedId, onSelectLot, placingMode, onPlace, 
 var DEFAULT_LOT_FORM = {
   name: '', address: '', total: 20,
   terrain: 'pavimentado', covered: 'descubierto', keyRequired: 'no',
-  security: [], hours: '07:00 – 22:00',
+  security: [], hoursWeek: '07:00 – 22:00', hoursWeekend: '08:00 – 20:00',
   payment: ['Efectivo'],
   firstHour: 5, addHour: 3, dailyCap: 40,
 };
@@ -432,8 +432,12 @@ function CreateLotDrawer({ pendingLatLng, onSave, onCancel, onChange }) {
               <MultiChip options={SECURITY_OPTIONS} value={form.security} onChange={function(v) { set({ security: v }); }} />
             </div>
             <div>
-              <FieldLabel>Horario</FieldLabel>
-              <Input value={form.hours} onChange={function(v) { set({ hours: v }); }} placeholder="07:00 – 22:00 o 24 horas" />
+              <FieldLabel>Horario · Lunes a viernes</FieldLabel>
+              <Input value={form.hoursWeek} onChange={function(v) { set({ hoursWeek: v }); }} placeholder="07:00 – 22:00 o 24 horas" />
+            </div>
+            <div>
+              <FieldLabel>Horario · Fines de semana y feriados</FieldLabel>
+              <Input value={form.hoursWeekend} onChange={function(v) { set({ hoursWeekend: v }); }} placeholder="08:00 – 20:00 o cerrado" />
             </div>
             <div>
               <FieldLabel>Métodos de pago</FieldLabel>
@@ -489,7 +493,7 @@ function EditLotDrawer({ lot, onSubmit, onCancel }) {
   var [form, setForm] = React.useState({
     name: lot.name || '', address: lot.address || '', total: lot.total || 1,
     terrain: lot.terrain || 'pavimentado', covered: coverOf(lot), keyRequired: keyReqOf(lot),
-    security: lot.security || [], hours: lot.hours || '',
+    security: lot.security || [], hoursWeek: hoursOf(lot).week, hoursWeekend: hoursOf(lot).weekend,
   });
   var [photoIds, setPhotoIds] = React.useState([]);
   var [photoErr, setPhotoErr] = React.useState(null);
@@ -502,8 +506,11 @@ function EditLotDrawer({ lot, onSubmit, onCancel }) {
   // normalizers so a legacy boolean lot isn't falsely flagged as changed.
   var changes = (function() {
     var c = {};
-    ['name', 'address', 'hours'].forEach(function(k) { if (form[k] !== lot[k]) c[k] = form[k]; });
+    ['name', 'address'].forEach(function(k) { if (form[k] !== lot[k]) c[k] = form[k]; });
     if (form.terrain !== lot.terrain) c.terrain = form.terrain;
+    var h = hoursOf(lot);
+    if (form.hoursWeek !== h.week) { c.hoursWeek = form.hoursWeek; c.hours = form.hoursWeek; }
+    if (form.hoursWeekend !== h.weekend) c.hoursWeekend = form.hoursWeekend;
     var t = toInt(form.total, 1, 1000); if (t !== lot.total) c.total = t;
     if (form.covered !== coverOf(lot)) c.covered = form.covered;
     if (form.keyRequired !== keyReqOf(lot)) c.keyRequired = form.keyRequired;
@@ -557,7 +564,8 @@ function EditLotDrawer({ lot, onSubmit, onCancel }) {
             <div><FieldLabel>Entrega de llave</FieldLabel><Choice options={KEY_CHOICES} value={keyReqOf(form)} onChange={function(v) { set({ keyRequired: v }); }} /></div>
           </div>
           <div><FieldLabel>Seguridad</FieldLabel><MultiChip options={SECURITY_OPTIONS} value={form.security} onChange={function(v) { set({ security: v }); }} /></div>
-          <div><FieldLabel>Horario</FieldLabel><Input value={form.hours} onChange={function(v) { set({ hours: v }); }} /></div>
+          <div><FieldLabel>Horario · Lunes a viernes</FieldLabel><Input value={form.hoursWeek} onChange={function(v) { set({ hoursWeek: v }); }} placeholder="07:00 – 22:00 o 24 horas" /></div>
+          <div><FieldLabel>Horario · Fines de semana y feriados</FieldLabel><Input value={form.hoursWeekend} onChange={function(v) { set({ hoursWeekend: v }); }} placeholder="08:00 – 20:00 o cerrado" /></div>
           <div style={{ paddingTop: 10, borderTop: '1px solid #f5f5f5' }}>
             <div style={{ fontWeight: 600, fontSize: 12, color: '#111', marginBottom: 4 }}>Fotos de respaldo *</div>
             <div style={{ fontSize: 11, color: '#999', marginBottom: 10, lineHeight: 1.5 }}>Sube al menos 3 fotos actuales del parqueo que respalden los cambios.</div>
@@ -607,7 +615,7 @@ function MapSection({ store, lots, lot, onSelectLot, session, lotEdits, refreshE
       lat: pendingLatLng.lat, lng: pendingLatLng.lng,
       total: form.total, occupied: 0,
       terrain: form.terrain, covered: form.covered, keyRequired: form.keyRequired,
-      security: form.security, hours: form.hours, payment: form.payment,
+      security: form.security, hoursWeek: form.hoursWeek, hoursWeekend: form.hoursWeekend, hours: form.hoursWeek, payment: form.payment,
       photoIds: photoIds, photos: photoIds.length,
       status: 'pending', // server assigns the authoritative status on push
       fees: { firstHour: form.firstHour, addHour: form.addHour, weekendMult: 1, peakMult: 1, peakHours: '', dailyCap: form.dailyCap },
@@ -1403,25 +1411,34 @@ function LotStatusPill({ status }) {
 // Polls /api/me so an operator's pending→approved transition appears without
 // a re-login. Seeds from the stored session snapshot.
 function useMyVerifStatus(sess) {
-  var [status, setStatus] = React.useState((sess && sess.verifStatus) || 'unsubmitted');
+  var seeded = (sess && sess.verifStatus) || 'unsubmitted';
+  var [status, setStatus] = React.useState(seeded);
   var [rejectReason, setRejectReason] = React.useState((sess && sess.verifRejectReason) || null);
+  // `checked` = we've confirmed the status from the server. Until then we do NOT
+  // show the verification form (which caused an approved operator to see the
+  // "fill your data" page for ~10 s before the first poll landed). The first
+  // fetch now fires as soon as the API is ready, not only on the 8 s interval.
+  var [checked, setChecked] = React.useState(seeded === 'approved');
   React.useEffect(function() {
     if (!sess || sess.role !== 'operador') return;
-    var alive = true;
+    var alive = true, id = null;
     function poll() {
-      if (!window.LlamitaApi || !window.LlamitaApi.isAvailable()) return;
       window.LlamitaApi.req('GET', '/api/me').then(function(r) {
         if (!alive || !r.user) return;
         setStatus(r.user.verifStatus || 'unsubmitted');
         setRejectReason(r.user.verifRejectReason || null);
-      }).catch(function() {});
+        setChecked(true);
+      }).catch(function() { if (alive) setChecked(true); });
     }
-    poll();
-    var id = setInterval(poll, 8000);
-    return function() { alive = false; clearInterval(id); };
+    window.LlamitaApi.ready.then(function(ok) {
+      if (!alive) return;
+      if (ok) { poll(); id = setInterval(poll, 8000); }
+      else setChecked(true); // no backend → the gate's apiUp condition is false anyway
+    });
+    return function() { alive = false; if (id) clearInterval(id); };
   }, [sess && sess.id, sess && sess.role]);
   return {
-    status: status, rejectReason: rejectReason,
+    status: status, rejectReason: rejectReason, checked: checked,
     setLocal: function(u) { setStatus((u && u.verifStatus) || 'pending'); setRejectReason((u && u.verifRejectReason) || null); },
   };
 }
@@ -1559,6 +1576,17 @@ function OwnerApp({ store, session, onSignOut }) {
   // Gate: unverified operators (server-backed only) see the verification flow,
   // not the dashboard. Runs after all hooks above so hook order stays stable.
   if (apiUp && sess.role === 'operador' && verif.status !== 'approved') {
+    // Until the status is confirmed from the server, show a neutral loader —
+    // never the "fill your data" form — so an already-approved operator doesn't
+    // flash through it while /api/me is in flight.
+    if (!verif.checked) {
+      return (
+        <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--c-bg)' }}>
+          <img src="assets/brand/logo-horizontal.png" alt="Llamita" style={{ height: 34, width: 'auto' }} />
+          <div style={{ marginTop: 22, width: 30, height: 30, borderRadius: '50%', border: '3px solid #e2e8de', borderTopColor: 'var(--c-accent)', animation: 'llamita-spin 0.8s linear infinite' }} />
+        </div>
+      );
+    }
     return (
       <OperatorVerificationGate
         session={sess} status={verif.status} rejectReason={verif.rejectReason}
