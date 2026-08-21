@@ -918,6 +918,22 @@ function OperationsSection({ store, lot, now }) {
   var [newDriver, setNewDriver] = React.useState('');
   var [newSpot, setNewSpot] = React.useState('');
 
+  // Manual availability control (kept in sync with the lot). The field holds the
+  // number of FREE spaces (0 = lleno). Entrada/Salida just nudge occupancy — they
+  // do NOT create sessions or touch the sales registry.
+  var [availStr, setAvailStr] = React.useState(String(lot.total - lot.occupied));
+  React.useEffect(function() { setAvailStr(String(lot.total - lot.occupied)); }, [lot.occupied, lot.total, lot.id]);
+  function setAvailable(v) {
+    setAvailStr(v);
+    if (String(v).trim() === '') return;               // allow clearing the field
+    var n = parseInt(v, 10);
+    if (isNaN(n)) return;
+    n = Math.max(0, Math.min(lot.total, n));
+    setOccupied(lot.id, lot.total - n);
+  }
+  function entrada() { if (lot.occupied < lot.total) setOccupied(lot.id, lot.occupied + 1); }
+  function salida()  { if (lot.occupied > 0)          setOccupied(lot.id, lot.occupied - 1); }
+
   function submitCheckIn() {
     if (!newPlate.trim()) return;
     checkIn({ lot: lot.id, plate: newPlate.trim().toUpperCase(), driver: newDriver.trim() || '—', spot: newSpot.trim() || ('A-' + String(lot.occupied + 1).padStart(2,'0')), entry: now });
@@ -937,6 +953,19 @@ function OperationsSection({ store, lot, now }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
 
+      {/* Floating "syncing" toast — fixed, so it never reflows the controls. */}
+      {pulseLotId === lot.id && (
+        <div style={{
+          position: 'fixed', bottom: 20, right: 20, zIndex: 3000, pointerEvents: 'none',
+          display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 999,
+          background: 'rgba(5,46,34,0.92)', color: '#fff', fontFamily: 'var(--font-mono)', fontSize: 12,
+          boxShadow: '0 6px 20px rgba(0,0,0,0.22)',
+        }}>
+          <span style={{ width: 12, height: 12, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', display: 'inline-block', animation: 'llamita-spin 0.8s linear infinite' }}/>
+          Sincronizando…
+        </div>
+      )}
+
       {/* LEFT */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {/* Live status */}
@@ -949,7 +978,6 @@ function OperationsSection({ store, lot, now }) {
               </div>
               <div style={{ fontSize: 11, color: '#aaa', marginTop: 3 }}>
                 Visible a conductores en tiempo real.
-                {pulseLotId === lot.id && <span style={{ color: 'var(--c-accent)', fontWeight: 600 }}> · ⟳ sincronizando…</span>}
               </div>
             </div>
             <span style={{ flexShrink: 0 }}>
@@ -958,18 +986,26 @@ function OperationsSection({ store, lot, now }) {
               </Btn>
             </span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 28, fontWeight: 700, color: isFull ? '#E74C3C' : '#27AE60', minWidth: 76 }}>
-              {lot.occupied}<span style={{ color: '#bbb', fontWeight: 400 }}>/{lot.total}</span>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ width: 140 }}>
+              <FieldLabel>Espacios disponibles</FieldLabel>
+              <Input value={availStr} onChange={setAvailable} type="number" min="0" max={lot.total} mono suffix={'/ ' + lot.total} />
             </div>
-            <div style={{ flex: 1 }}>
-              <input type="range" min="0" max={lot.total} value={lot.occupied}
-                onChange={function(e) { setOccupied(lot.id, Number(e.target.value)); }}
-                style={{ width: '100%', accentColor: isFull ? '#E74C3C' : '#27AE60' }}/>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: 10, color: '#aaa', marginTop: 2 }}>
-                <span>0</span><span>{lot.total} total</span>
-              </div>
+            <div style={{ display: 'flex', gap: 8, flex: 1, minWidth: 180 }}>
+              <button onClick={entrada} disabled={isFull} style={{
+                flex: 1, padding: '12px 0', borderRadius: 10, border: 'none',
+                background: isFull ? '#eee' : '#27AE60', color: isFull ? '#aaa' : '#fff',
+                fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 700, cursor: isFull ? 'not-allowed' : 'pointer',
+              }}>Entrada</button>
+              <button onClick={salida} disabled={lot.occupied === 0} style={{
+                flex: 1, padding: '12px 0', borderRadius: 10, border: 'none',
+                background: lot.occupied === 0 ? '#eee' : '#E74C3C', color: lot.occupied === 0 ? '#aaa' : '#fff',
+                fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 700, cursor: lot.occupied === 0 ? 'not-allowed' : 'pointer',
+              }}>Salida</button>
             </div>
+          </div>
+          <div style={{ fontSize: 10, color: '#aaa', marginTop: 8, lineHeight: 1.5 }}>
+            0 = lleno. «Entrada» y «Salida» ajustan la disponibilidad sin registrar en el registro de ventas.
           </div>
           <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 8, background: '#fafafa', border: '1px solid #f0f0f0', fontFamily: 'var(--font-mono)', fontSize: 12, color: '#27AE60', display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#27AE60', display: 'inline-block' }}/>
