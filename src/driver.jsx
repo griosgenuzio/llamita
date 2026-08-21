@@ -2,7 +2,7 @@
 // window.LlamitaDriver = { DriverApp }
 
 const { LeafletParkingMap } = window.LlamitaLeafletMap;
-const { formatBs, locate, distanceKm, coverLabel, keyReqLabel, isCovered, hoursOf } = window.LlamitaData;
+const { formatBs, locate, distanceKm, coverLabel, keyReqLabel, keyReqOf, isCovered, hoursOf } = window.LlamitaData;
 
 const AVAIL = '#32C87A';
 const FULL  = '#E05A4B';
@@ -152,6 +152,7 @@ function LotDetailSheet({ lot, onClose, onDirections, route, routeLoading, route
     { k: 'Terreno',           v: lot.terrain.charAt(0).toUpperCase() + lot.terrain.slice(1) },
     { k: 'Techo',             v: coverLabel(lot) },
     { k: 'Entrega de llave',  v: keyReqLabel(lot) },
+    { k: 'Motocicletas',      v: lot.motos ? 'Sí 🏍️' : 'No' },
     { k: 'Seguridad',         v: lot.security.join(' · ') || '—' },
     { k: 'Lun – Vie',         v: hoursOf(lot).week || '—' },
     { k: 'Fines y feriados',  v: hoursOf(lot).weekend || '—' },
@@ -333,7 +334,7 @@ function ReferenceLotSheet({ lot, onClose, onDirections, route, routeLoading, ro
 function DriverApp({ store, session, onSignOut }) {
   const { lots, pulseLotId } = store;
   const [selectedId, setSelectedId] = React.useState(null);
-  const [filters, setFilters] = React.useState({ available: false, covered: false, key: false });
+  const [filters, setFilters] = React.useState({ available: false, covered: false, key: false, motos: false });
   const [view, setView] = React.useState('mapa');
   const [showRefs, setShowRefs] = React.useState(false); // references in the list, on demand
   const [userLoc, setUserLoc] = React.useState(null);    // driver's own position (triangle marker)
@@ -408,7 +409,8 @@ function DriverApp({ store, session, onSignOut }) {
   const filterFn = React.useCallback((l) => {
     if (filters.available && l.occupied >= l.total) return false;
     if (filters.covered && !isCovered(l)) return false;
-    if (filters.key && !l.keyRequired) return false;
+    if (filters.key && keyReqOf(l) === 'obligatoria') return false;
+    if (filters.motos && !l.motos) return false;
     return true;
   }, [filters]);
 
@@ -548,6 +550,7 @@ function DriverApp({ store, session, onSignOut }) {
           <FilterChip active={filters.available} onClick={() => setFilters(f => ({ ...f, available: !f.available }))}>Disponibles</FilterChip>
           <FilterChip active={filters.covered}   onClick={() => setFilters(f => ({ ...f, covered:   !f.covered   }))}>Cubierto</FilterChip>
           <FilterChip active={filters.key}       onClick={() => setFilters(f => ({ ...f, key:       !f.key       }))}>Sin llave</FilterChip>
+          <FilterChip active={filters.motos}     onClick={() => setFilters(f => ({ ...f, motos:     !f.motos     }))}>🏍️ Motos</FilterChip>
         </div>
       </div>
 
@@ -579,7 +582,10 @@ function DriverApp({ store, session, onSignOut }) {
                     boxShadow: `0 0 0 3px ${full ? 'rgba(224,90,75,0.15)' : 'rgba(50,200,122,0.15)'}`,
                   }}/>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lot.name}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lot.name}</span>
+                      {lot.motos && <span title="Acepta motocicletas" style={{ flexShrink: 0, fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--c-accent)', background: 'rgba(163,230,53,0.18)', padding: '1px 5px', borderRadius: 4 }}>🏍️ MOTOS</span>}
+                    </div>
                     <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#999', marginTop: 2 }}>{lot.address}</div>
                     {dLabel && (
                       <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#2563EB', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>

@@ -386,7 +386,7 @@ function OwnerLeafletMap({ lots, selectedId, onSelectLot, placingMode, onPlace, 
 
 var DEFAULT_LOT_FORM = {
   name: '', address: '', total: 20,
-  terrain: 'pavimentado', covered: 'descubierto', keyRequired: 'no',
+  terrain: 'pavimentado', covered: 'descubierto', keyRequired: 'no', motos: false,
   security: [], hoursWeek: '07:00 – 22:00', hoursWeekend: '08:00 – 20:00',
   payment: ['Efectivo'],
   firstHour: 5, addHour: 3, dailyCap: 40,
@@ -484,6 +484,7 @@ function CreateLotDrawer({ pendingLatLng, onSave, onCancel, onChange }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 0', borderTop: '1px solid #f5f5f5', borderBottom: '1px solid #f5f5f5' }}>
               <div><FieldLabel>Techo</FieldLabel><Choice options={COVER_CHOICES} value={coverOf(form)} onChange={function(v) { set({ covered: v }); }} /></div>
               <div><FieldLabel>Entrega de llave</FieldLabel><Choice options={KEY_CHOICES} value={keyReqOf(form)} onChange={function(v) { set({ keyRequired: v }); }} /></div>
+              <div style={{ marginTop: 4 }}><Toggle value={!!form.motos} onChange={function(v) { set({ motos: v }); }} label="Aceptamos motocicletas 🏍️" /></div>
             </div>
 
             <div>
@@ -551,7 +552,7 @@ function EditLotDrawer({ lot, onSubmit, onCancel }) {
   var isMobile = useIsMobile();
   var [form, setForm] = React.useState({
     name: lot.name || '', address: lot.address || '', total: lot.total || 1,
-    terrain: lot.terrain || 'pavimentado', covered: coverOf(lot), keyRequired: keyReqOf(lot),
+    terrain: lot.terrain || 'pavimentado', covered: coverOf(lot), keyRequired: keyReqOf(lot), motos: !!lot.motos,
     security: lot.security || [], hoursWeek: hoursOf(lot).week, hoursWeekend: hoursOf(lot).weekend,
   });
   // Seed with the lot's current photos so the operator sees them and can add,
@@ -575,6 +576,7 @@ function EditLotDrawer({ lot, onSubmit, onCancel }) {
     var t = toInt(form.total, 1, 1000); if (t !== lot.total) c.total = t;
     if (form.covered !== coverOf(lot)) c.covered = form.covered;
     if (form.keyRequired !== keyReqOf(lot)) c.keyRequired = form.keyRequired;
+    if (!!form.motos !== !!lot.motos) c.motos = !!form.motos;
     if (JSON.stringify(form.security || []) !== JSON.stringify(lot.security || [])) c.security = form.security;
     return c;
   })();
@@ -624,6 +626,7 @@ function EditLotDrawer({ lot, onSubmit, onCancel }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 0', borderTop: '1px solid #f5f5f5', borderBottom: '1px solid #f5f5f5' }}>
             <div><FieldLabel>Techo</FieldLabel><Choice options={COVER_CHOICES} value={coverOf(form)} onChange={function(v) { set({ covered: v }); }} /></div>
             <div><FieldLabel>Entrega de llave</FieldLabel><Choice options={KEY_CHOICES} value={keyReqOf(form)} onChange={function(v) { set({ keyRequired: v }); }} /></div>
+            <div style={{ marginTop: 4 }}><Toggle value={!!form.motos} onChange={function(v) { set({ motos: v }); }} label="Aceptamos motocicletas 🏍️" /></div>
           </div>
           <div><FieldLabel>Seguridad</FieldLabel><MultiChip options={SECURITY_OPTIONS} value={form.security} onChange={function(v) { set({ security: v }); }} /></div>
           <div><FieldLabel>Horario · Lunes a viernes</FieldLabel><Input value={form.hoursWeek} onChange={function(v) { set({ hoursWeek: v }); }} placeholder="07:00 – 22:00 o 24 horas" /></div>
@@ -676,7 +679,7 @@ function MapSection({ store, lots, lot, onSelectLot, session, lotEdits, refreshE
       name: form.name, address: form.address,
       lat: pendingLatLng.lat, lng: pendingLatLng.lng,
       total: form.total, occupied: 0,
-      terrain: form.terrain, covered: form.covered, keyRequired: form.keyRequired,
+      terrain: form.terrain, covered: form.covered, keyRequired: form.keyRequired, motos: !!form.motos,
       security: form.security, hoursWeek: form.hoursWeek, hoursWeekend: form.hoursWeekend, hours: form.hoursWeek, payment: form.payment,
       photoIds: photoIds, photos: photoIds.length,
       status: 'pending', // server assigns the authoritative status on push
