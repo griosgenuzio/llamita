@@ -1,7 +1,11 @@
 // owner.jsx — Owner dashboard
 // window.LlamitaOwner = { OwnerApp }
 
-const { formatBs, parseHM, fmtDuration, calcPrice, useIsMobile, locate, coverOf, keyReqOf, hoursOf } = window.LlamitaData;
+const { formatBs, parseHM, fmtDuration, calcPrice, calcPriceTable, useIsMobile, locate, coverOf, keyReqOf, hoursOf } = window.LlamitaData;
+
+// Standard La Paz stepped tariff (minutes → Bs) used as the "usar plantilla" seed.
+var STD_TIERS = [[30, 6], [60, 9], [120, 10], [180, 12], [240, 14], [300, 16], [360, 18], [420, 20], [480, 22], [540, 24], [900, 26], [1200, 28], [1440, 31]]
+  .map(function(r) { return { maxMin: r[0], price: r[1] }; });
 
 // Number-field helpers: keep the raw typed string in state (so the box can be
 // cleared and typed freely), and coerce only when saving.
@@ -495,7 +499,9 @@ function EditLotDrawer({ lot, onSubmit, onCancel }) {
     terrain: lot.terrain || 'pavimentado', covered: coverOf(lot), keyRequired: keyReqOf(lot),
     security: lot.security || [], hoursWeek: hoursOf(lot).week, hoursWeekend: hoursOf(lot).weekend,
   });
-  var [photoIds, setPhotoIds] = React.useState([]);
+  // Seed with the lot's current photos so the operator sees them and can add,
+  // remove, or replace. The submitted set becomes the lot's photos on approval.
+  var [photoIds, setPhotoIds] = React.useState((lot.photoIds || []).slice());
   var [photoErr, setPhotoErr] = React.useState(null);
   var [err, setErr] = React.useState(null);
   var [saving, setSaving] = React.useState(false);
@@ -517,7 +523,8 @@ function EditLotDrawer({ lot, onSubmit, onCancel }) {
     if (JSON.stringify(form.security || []) !== JSON.stringify(lot.security || [])) c.security = form.security;
     return c;
   })();
-  var hasChanges = Object.keys(changes).length > 0;
+  var photosChanged = JSON.stringify(photoIds) !== JSON.stringify(lot.photoIds || []);
+  var hasChanges = Object.keys(changes).length > 0 || photosChanged;
   var canSubmit = form.name.trim() && form.address.trim() && toInt(form.total, 1, 1000) >= 1 && photoIds.length >= 3 && hasChanges && !saving;
 
   function submit() {
@@ -567,8 +574,8 @@ function EditLotDrawer({ lot, onSubmit, onCancel }) {
           <div><FieldLabel>Horario · Lunes a viernes</FieldLabel><Input value={form.hoursWeek} onChange={function(v) { set({ hoursWeek: v }); }} placeholder="07:00 – 22:00 o 24 horas" /></div>
           <div><FieldLabel>Horario · Fines de semana y feriados</FieldLabel><Input value={form.hoursWeekend} onChange={function(v) { set({ hoursWeekend: v }); }} placeholder="08:00 – 20:00 o cerrado" /></div>
           <div style={{ paddingTop: 10, borderTop: '1px solid #f5f5f5' }}>
-            <div style={{ fontWeight: 600, fontSize: 12, color: '#111', marginBottom: 4 }}>Fotos de respaldo *</div>
-            <div style={{ fontSize: 11, color: '#999', marginBottom: 10, lineHeight: 1.5 }}>Sube al menos 3 fotos actuales del parqueo que respalden los cambios.</div>
+            <div style={{ fontWeight: 600, fontSize: 12, color: '#111', marginBottom: 4 }}>Fotos del parqueo *</div>
+            <div style={{ fontSize: 11, color: '#999', marginBottom: 10, lineHeight: 1.5 }}>Estas son las fotos actuales. Toca la × para quitar una, o agrega nuevas. Mínimo 3. Un administrador revisará los cambios.</div>
             <LotPhotos value={photoIds} onChange={setPhotoIds} onError={function(c) { setPhotoErr(window.LlamitaApi.errorMessage({ message: c })); }} />
             {photoErr && <div style={{ color: '#c0392b', fontSize: 11, marginTop: 6 }}>{photoErr}</div>}
           </div>
@@ -1161,54 +1168,87 @@ function RegistrySection({ store, lot }) {
 function FeesSection({ store, lot }) {
   var isMobile = useIsMobile();
   var { updateLot } = store;
-  var f = lot.fees;
+  var f = lot.fees || {};
+  var mode = f.mode === 'table' ? 'table' : 'formula';
+  var tiers = (f.tiers && f.tiers.length) ? f.tiers : [];
   var set = function(patch) { updateLot(lot.id, { fees: Object.assign({}, f, patch) }); };
 
+  function switchMode(m) {
+    if (m === 'table') set({ mode: 'table', tiers: (f.tiers && f.tiers.length) ? f.tiers : STD_TIERS });
+    else set({ mode: 'formula' });
+  }
+  function setTier(i, patch) { var t = tiers.slice(); t[i] = Object.assign({}, t[i], patch); set({ tiers: t }); }
+  function removeTier(i) { set({ tiers: tiers.filter(function(_, j) { return j !== i; }) }); }
+  function addTier() { var last = tiers[tiers.length - 1] || { maxMin: 0, price: 0 }; set({ tiers: tiers.concat([{ maxMin: last.maxMin + 60, price: last.price }]) }); }
+
   var examples = [
-    { label: '1 hora · día laboral',   mins: 60,  weekend: false, peak: false },
-    { label: '2 horas · día laboral',  mins: 120, weekend: false, peak: false },
-    { label: '3 horas · día laboral',  mins: 180, weekend: false, peak: false },
-    { label: '1 hora · fin de semana', mins: 60,  weekend: true,  peak: false },
-    { label: '2 horas · hora pico',    mins: 120, weekend: false, peak: true  },
-    { label: '8 horas (jornada)',       mins: 480, weekend: false, peak: false },
+    { label: '30 minutos',  mins: 30,  weekend: false, peak: false },
+    { label: '1 hora',      mins: 60,  weekend: false, peak: false },
+    { label: '2 horas',     mins: 120, weekend: false, peak: false },
+    { label: '3 horas',     mins: 180, weekend: false, peak: false },
+    { label: '8 horas (jornada)', mins: 480, weekend: false, peak: false },
+    { label: '24 horas',    mins: 1440, weekend: false, peak: false },
   ];
+  function priceFor(mins, weekend, peak) {
+    if (mode === 'table') return calcPriceTable(mins, tiers, f.perDayAfterMax !== false);
+    var hours = Math.ceil(mins / 60);
+    var amount = f.firstHour || 0;
+    if (hours > 1) amount += (hours - 1) * (f.addHour || 0);
+    if (weekend) amount *= (f.weekendMult || 1);
+    if (peak)    amount *= (f.peakMult || 1);
+    if (f.dailyCap) amount = Math.min(amount, f.dailyCap);
+    return Math.round(amount * 100) / 100;
+  }
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.1fr 1fr', gap: 16, height: isMobile ? 'auto' : '100%' }}>
       <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 12, padding: 16 }}>
         <h3 style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 600 }}>Parámetros de tarifa</h3>
-        <div style={{ fontSize: 12, color: '#aaa', marginBottom: 16 }}>Aplica a <strong style={{ color: '#111' }}>{lot.name}</strong></div>
+        <div style={{ fontSize: 12, color: '#aaa', marginBottom: 14 }}>Aplica a <strong style={{ color: '#111' }}>{lot.name}</strong></div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
-          <div>
-            <FieldLabel>Primera hora</FieldLabel>
-            <Input value={f.firstHour} onChange={function(v) { set({ firstHour: Number(v)||0 }); }} suffix="Bs" mono type="number" />
-          </div>
-          <div>
-            <FieldLabel>Hora adicional</FieldLabel>
-            <Input value={f.addHour} onChange={function(v) { set({ addHour: Number(v)||0 }); }} suffix="Bs" mono type="number" />
-          </div>
-          <div>
-            <FieldLabel>Multiplicador fin de semana</FieldLabel>
-            <Input value={f.weekendMult} onChange={function(v) { set({ weekendMult: Number(v)||1 }); }} suffix="×" mono type="number" />
-          </div>
-          <div>
-            <FieldLabel>Multiplicador hora pico</FieldLabel>
-            <Input value={f.peakMult} onChange={function(v) { set({ peakMult: Number(v)||1 }); }} suffix="×" mono type="number" />
-          </div>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <FieldLabel>Franjas hora pico</FieldLabel>
-            <Input value={f.peakHours} onChange={function(v) { set({ peakHours: v }); }} placeholder="08:00–10:00, 18:00–20:00" />
-          </div>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <FieldLabel>Tope diario</FieldLabel>
-            <Input value={f.dailyCap} onChange={function(v) { set({ dailyCap: Number(v)||0 }); }} suffix="Bs" mono type="number" />
-          </div>
+        <div style={{ marginBottom: 16 }}>
+          <FieldLabel>Modo de tarifa</FieldLabel>
+          <Choice options={[['formula', 'Por fórmula'], ['table', 'Por tabla']]} value={mode} onChange={switchMode} />
         </div>
 
-        <div style={{ padding: 12, borderRadius: 8, background: '#fafafa', border: '1px solid #f0f0f0', fontFamily: 'var(--font-mono)', fontSize: 11, color: '#aaa', lineHeight: 1.6 }}>
-          <strong style={{ color: '#111' }}>Cómo se calcula:</strong> 1ª hora fija + (horas adicionales × tarifa). Fin de semana y hora pico aplican multiplicadores. Total nunca supera el tope diario.
-        </div>
+        {mode === 'formula' ? (
+          <React.Fragment>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+              <div><FieldLabel>Primera hora</FieldLabel><Input value={f.firstHour} onChange={function(v) { set({ firstHour: Number(v) || 0 }); }} suffix="Bs" mono type="number" /></div>
+              <div><FieldLabel>Hora adicional</FieldLabel><Input value={f.addHour} onChange={function(v) { set({ addHour: Number(v) || 0 }); }} suffix="Bs" mono type="number" /></div>
+              <div><FieldLabel>Multiplicador fin de semana</FieldLabel><Input value={f.weekendMult} onChange={function(v) { set({ weekendMult: Number(v) || 1 }); }} suffix="×" mono type="number" /></div>
+              <div><FieldLabel>Multiplicador hora pico</FieldLabel><Input value={f.peakMult} onChange={function(v) { set({ peakMult: Number(v) || 1 }); }} suffix="×" mono type="number" /></div>
+              <div style={{ gridColumn: '1 / -1' }}><FieldLabel>Franjas hora pico</FieldLabel><Input value={f.peakHours} onChange={function(v) { set({ peakHours: v }); }} placeholder="08:00–10:00, 18:00–20:00" /></div>
+              <div style={{ gridColumn: '1 / -1' }}><FieldLabel>Tope diario</FieldLabel><Input value={f.dailyCap} onChange={function(v) { set({ dailyCap: Number(v) || 0 }); }} suffix="Bs" mono type="number" /></div>
+            </div>
+            <div style={{ padding: 12, borderRadius: 8, background: '#fafafa', border: '1px solid #f0f0f0', fontFamily: 'var(--font-mono)', fontSize: 11, color: '#aaa', lineHeight: 1.6 }}>
+              <strong style={{ color: '#111' }}>Cómo se calcula:</strong> 1ª hora fija + (horas adicionales × tarifa). Fin de semana y hora pico aplican multiplicadores. Total nunca supera el tope diario.
+            </div>
+          </React.Fragment>
+        ) : (
+          <React.Fragment>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ fontSize: 12, color: '#666' }}>Precio según el tiempo de estadía</div>
+              <button onClick={function() { set({ tiers: STD_TIERS }); }} style={{ padding: '5px 10px', borderRadius: 7, border: '1px solid #ddd', background: '#fff', fontSize: 11, color: '#444', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>Usar plantilla</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+              {tiers.map(function(t, i) {
+                return (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 11, color: '#888', width: 34, flexShrink: 0 }}>Hasta</span>
+                    <div style={{ width: 78, flexShrink: 0 }}><Input value={t.maxMin / 60} onChange={function(v) { setTier(i, { maxMin: Math.max(1, Math.round((parseFloat(v) || 0) * 60)) }); }} type="number" min="0" step="0.5" mono suffix="h" /></div>
+                    <div style={{ flex: 1, minWidth: 0 }}><Input value={t.price} onChange={function(v) { setTier(i, { price: parseFloat(v) || 0 }); }} type="number" min="0" mono suffix="Bs" /></div>
+                    <button onClick={function() { removeTier(i); }} title="Quitar" style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 6, border: '1px solid #f0d2cc', background: '#fff', color: '#c0392b', fontSize: 15, cursor: 'pointer', lineHeight: 1 }}>×</button>
+                  </div>
+                );
+              })}
+              <button onClick={addTier} style={{ marginTop: 2, padding: '7px 0', borderRadius: 7, border: '1px dashed #ccc', background: '#fff', fontSize: 12, color: '#666', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>+ Agregar tramo</button>
+            </div>
+            <div style={{ padding: 12, borderRadius: 8, background: '#fafafa', border: '1px solid #f0f0f0', fontFamily: 'var(--font-mono)', fontSize: 11, color: '#aaa', lineHeight: 1.6 }}>
+              <strong style={{ color: '#111' }}>Cómo se calcula:</strong> se cobra el precio del primer tramo cuyo tiempo cubre la estadía (ej.: 1h30 → tramo «hasta 2h»). Más allá de la última fila, se cobra por día.
+            </div>
+          </React.Fragment>
+        )}
       </div>
 
       <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 12, padding: 16 }}>
@@ -1216,19 +1256,10 @@ function FeesSection({ store, lot }) {
         <div style={{ fontSize: 12, color: '#aaa', marginBottom: 14 }}>Con la tarifa actual.</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {examples.map(function(e) {
-            var hours = Math.ceil(e.mins / 60);
-            var amount = f.firstHour;
-            if (hours > 1) amount += (hours - 1) * f.addHour;
-            if (e.weekend) amount *= (f.weekendMult || 1);
-            if (e.peak)    amount *= (f.peakMult || 1);
-            if (f.dailyCap) amount = Math.min(amount, f.dailyCap);
-            amount = Math.round(amount * 100) / 100;
+            var amount = priceFor(e.mins, e.weekend, e.peak);
             return (
               <div key={e.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderRadius: 8, background: '#fafafa', border: '1px solid #f0f0f0' }}>
-                <div>
-                  <div style={{ fontSize: 12, color: '#111' }}>{e.label}</div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#aaa', marginTop: 1 }}>{hours} hora{hours!==1?'s':''} cobradas</div>
-                </div>
+                <div style={{ fontSize: 12, color: '#111' }}>{e.label}</div>
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: 17, fontWeight: 700, color: 'var(--c-accent)' }}>{formatBs(amount)}</div>
               </div>
             );

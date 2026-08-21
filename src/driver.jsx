@@ -71,6 +71,22 @@ function UserMenu({ session, onSignOut }) {
 function fmtEta(s) { const m = Math.max(1, Math.round((s || 0) / 60)); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + (m % 60) + ' min'; }
 function fmtDist(m) { return (m || 0) < 1000 ? Math.round(m || 0) + ' m' : (m / 1000).toFixed(1).replace('.', ',') + ' km'; }
 
+// Table-pricing helpers (driver-facing).
+function tierTimeLabel(maxMin) { return maxMin < 60 ? (maxMin + ' min') : ((maxMin / 60) + ' h'); }
+function TariffTable({ tiers }) {
+  const s = tiers.slice().sort((a, b) => a.maxMin - b.maxMin);
+  return (
+    <div style={{ marginTop: 10, border: '1px solid #f0f0f0', borderRadius: 12, overflow: 'hidden' }}>
+      {s.map((t, i) => (
+        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 14px', borderBottom: i < s.length - 1 ? '1px solid #f5f5f5' : 'none', fontSize: 13 }}>
+          <span style={{ color: '#666' }}>Hasta {tierTimeLabel(t.maxMin)}</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#111' }}>{formatBs(t.price)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // In-app directions panel: shown once a route is fetched (ETA · distance + a
 // collapsible turn list + "Cerrar ruta"), or a graceful fallback on error.
 function RoutePanel({ lot, route, routeError, onClearRoute }) {
@@ -126,6 +142,10 @@ function LotDetailSheet({ lot, onClose, onDirections, route, routeLoading, route
   if (!lot) return null;
   const available = Math.max(0, lot.total - lot.occupied);
   const full = available === 0;
+  const fees = lot.fees || {};
+  const isTable = fees.mode === 'table' && Array.isArray(fees.tiers) && fees.tiers.length > 0;
+  const tierMin = isTable ? Math.min.apply(null, fees.tiers.map(t => t.price)) : null;
+  const [showTariff, setShowTariff] = React.useState(false);
 
   const rows = [
     { k: 'Cupos libres',      v: `${available} de ${lot.total}` },
@@ -209,13 +229,24 @@ function LotDetailSheet({ lot, onClose, onDirections, route, routeLoading, route
       }}>
         <div>
           <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>Tarifa</div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, color: '#111' }}>
-            {formatBs(lot.fees.firstHour)}
-            <span style={{ fontSize: 11, fontWeight: 400, color: '#999' }}> / 1ª hora</span>
-          </div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#aaa', marginTop: 2 }}>
-            +{formatBs(lot.fees.addHour)} c/hora adicional
-          </div>
+          {isTable ? (
+            <React.Fragment>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, color: '#111' }}>desde {formatBs(tierMin)}</div>
+              <button onClick={() => setShowTariff(s => !s)} style={{ marginTop: 3, background: 'none', border: 'none', padding: 0, color: '#1d4ed8', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+                {showTariff ? 'Ocultar tarifas' : 'Ver tarifas'}
+              </button>
+            </React.Fragment>
+          ) : (
+            <React.Fragment>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, color: '#111' }}>
+                {formatBs(fees.firstHour)}
+                <span style={{ fontSize: 11, fontWeight: 400, color: '#999' }}> / 1ª hora</span>
+              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#aaa', marginTop: 2 }}>
+                +{formatBs(fees.addHour)} c/hora adicional
+              </div>
+            </React.Fragment>
+          )}
         </div>
         <button
           onClick={() => { if (!full && !routeLoading) onDirections(lot); }}
@@ -228,6 +259,8 @@ function LotDetailSheet({ lot, onClose, onDirections, route, routeLoading, route
             whiteSpace: 'nowrap', flexShrink: 0, opacity: routeLoading ? 0.75 : 1,
           }}>{full ? 'Sin cupos' : (routeLoading ? 'Trazando…' : 'Cómo llegar')}</button>
       </div>
+
+      {isTable && showTariff && <TariffTable tiers={fees.tiers} />}
 
       <RoutePanel lot={lot} route={route} routeError={routeError} onClearRoute={onClearRoute} />
     </div>
@@ -560,7 +593,9 @@ function DriverApp({ store, session, onSignOut }) {
                       {full ? 'LLENO' : `${avail} libres`}
                     </div>
                     <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#aaa', marginTop: 1 }}>
-                      {formatBs(lot.fees.firstHour)}/h
+                      {lot.fees && lot.fees.mode === 'table' && lot.fees.tiers && lot.fees.tiers.length
+                        ? `desde ${formatBs(Math.min.apply(null, lot.fees.tiers.map(t => t.price)))}`
+                        : `${formatBs(lot.fees.firstHour)}/h`}
                     </div>
                   </div>
                 </button>

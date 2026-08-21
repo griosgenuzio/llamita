@@ -904,7 +904,15 @@ async function handleApi(req, res, pathname) {
           (changes.total !== undefined && !(Number(changes.total) >= 1))) {
         return json(res, 400, { error: 'invalid_edit' });
       }
-      if (!Object.keys(changes).length) return json(res, 400, { error: 'no_changes' });
+      // A photo-only edit (add/remove/replace) is allowed even with no field
+      // changes, as long as the photo set actually differs from the current lot.
+      const curPhotos = (() => {
+        const st = JSON.parse(db.prepare('SELECT data FROM app_state WHERE id = 1').get().data);
+        const l = st.lots.find(x => x.id === lotId);
+        return (l && Array.isArray(l.photoIds)) ? l.photoIds : [];
+      })();
+      const photosChanged = JSON.stringify(validPhotos) !== JSON.stringify(curPhotos);
+      if (!Object.keys(changes).length && !photosChanged) return json(res, 400, { error: 'no_changes' });
       db.prepare("DELETE FROM lot_edits WHERE lot_id = ? AND status = 'pending'").run(lotId);
       const editId = uid('ed');
       db.prepare(`INSERT INTO lot_edits (id,lot_id,owner_id,changes,photo_ids,status,submitted_at)
@@ -958,12 +966,14 @@ async function handleApi(req, res, pathname) {
           .run(nowIso(), who.id, String(bd.reason || 'Sin especificar'), editId);
         return json(res, 200, { ok: true, status: 'rejected' });
       }
-      // Approve: apply the proposed changes to the live lot in the blob.
+      // Approve: apply the proposed changes to the live lot in the blob, and
+      // sync the photo set so drivers see the added/removed/replaced photos.
       const changes = JSON.parse(ed.changes || '{}');
+      const editPhotos = JSON.parse(ed.photo_ids || '[]');
       const stateRow = db.prepare('SELECT version, data FROM app_state WHERE id = 1').get();
       const state = JSON.parse(stateRow.data);
       let found = false;
-      state.lots = state.lots.map(l => (l.id === ed.lot_id ? (found = true, Object.assign({}, l, changes)) : l));
+      state.lots = state.lots.map(l => (l.id === ed.lot_id ? (found = true, Object.assign({}, l, changes, { photoIds: editPhotos, photos: editPhotos.length })) : l));
       if (found) db.prepare('UPDATE app_state SET version = ?, data = ? WHERE id = 1').run(stateRow.version + 1, JSON.stringify(state));
       db.prepare("UPDATE lot_edits SET status='approved', reviewed_at=?, reviewed_by=? WHERE id=?").run(nowIso(), who.id, editId);
       // Keep the verification record's address/photos in step with the approved edit.

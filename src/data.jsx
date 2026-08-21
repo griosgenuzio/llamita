@@ -21,10 +21,24 @@ function fmtDuration(mins) {
   return h > 0 ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m`;
 }
 
+// Table (stepped) pricing: the price is the value of the first tier whose upper
+// bound (maxMin, in minutes) covers the stay. Beyond the largest tier, charge
+// per extra day (unless perDay is false).
+function calcPriceTable(mins, tiers, perDay) {
+  if (!tiers || !tiers.length) return 0;
+  const s = tiers.slice().sort((a, b) => a.maxMin - b.maxMin);
+  for (const t of s) if (mins <= t.maxMin) return t.price;
+  const last = s[s.length - 1];
+  return perDay ? Math.ceil(mins / last.maxMin) * last.price : last.price;
+}
+
 // Compute price given entry time, exit time, fee model and weekday.
 function calcPrice(entry, exit, fees, isWeekend = false, isPeak = false) {
   const mins = Math.max(0, parseHM(exit) - parseHM(entry));
   if (mins === 0) return { mins: 0, amount: 0 };
+  if (fees && fees.mode === 'table') {
+    return { mins, amount: Math.round(calcPriceTable(mins, fees.tiers, fees.perDayAfterMax !== false) * 100) / 100 };
+  }
   const hours = Math.ceil(mins / 60);
   let amount = fees.firstHour;
   if (hours > 1) amount += (hours - 1) * fees.addHour;
@@ -333,7 +347,7 @@ function useIsMobile(bp) {
 
 window.LlamitaData = {
   useLlamitaStore, useIsMobile,
-  formatBs, parseHM, fmtDuration, calcPrice,
+  formatBs, parseHM, fmtDuration, calcPrice, calcPriceTable,
   locate, distanceKm,
   coverOf, isCovered, coverLabel, keyReqOf, keyReqLabel, hoursOf,
 };
