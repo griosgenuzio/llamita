@@ -1380,6 +1380,7 @@ function FeesSection({ store, lot }) {
 
 function OwnerUserMenu({ session, onSignOut }) {
   var [open, setOpen] = React.useState(false);
+  var [showPwd, setShowPwd] = React.useState(false);
   var ref = React.useRef(null);
   React.useEffect(function() {
     var close = function(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
@@ -1387,8 +1388,10 @@ function OwnerUserMenu({ session, onSignOut }) {
     return function() { window.removeEventListener('mousedown', close); };
   }, [open]);
   if (!session) return null;
+  var ChangePasswordModal = window.LlamitaAuth.ChangePasswordModal;
   return (
     <div ref={ref} style={{ position: 'relative' }}>
+      {showPwd && <ChangePasswordModal onClose={function() { setShowPwd(false); }} />}
       <button onClick={function() { setOpen(function(o) { return !o; }); }} style={{
         display: 'flex', alignItems: 'center', gap: 8, padding: '4px 4px 4px 10px',
         borderRadius: 999, border: '1px solid #e5e5e5', background: '#fff', cursor: 'pointer',
@@ -1402,8 +1405,16 @@ function OwnerUserMenu({ session, onSignOut }) {
             <div style={{ fontSize: 12, fontWeight: 600, color: '#111' }}>{session.name}</div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#aaa', marginTop: 2 }}>{session.email}</div>
           </div>
-          <button onClick={function() { setOpen(false); onSignOut(); }} style={{
+          <button onClick={function() { setOpen(false); setShowPwd(true); }} style={{
             width: '100%', textAlign: 'left', padding: '8px 10px', marginTop: 4,
+            background: 'transparent', border: 'none', borderRadius: 6,
+            fontFamily: 'var(--font-sans)', fontSize: 12, color: '#333', cursor: 'pointer',
+          }} onMouseEnter={function(e) { e.target.style.background='#f5f5f5'; }}
+             onMouseLeave={function(e) { e.target.style.background='transparent'; }}>
+            🔑 Cambiar contraseña
+          </button>
+          <button onClick={function() { setOpen(false); onSignOut(); }} style={{
+            width: '100%', textAlign: 'left', padding: '8px 10px',
             background: 'transparent', border: 'none', borderRadius: 6,
             fontFamily: 'var(--font-sans)', fontSize: 12, color: '#333', cursor: 'pointer',
           }} onMouseEnter={function(e) { e.target.style.background='#f5f5f5'; }}

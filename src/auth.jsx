@@ -121,6 +121,58 @@ function resendCode(verifyId) {
     .catch((e) => ({ error: window.LlamitaApi.errorMessage(e), code: e && e.message }));
 }
 
+// ─────────── Password reset (forgot password, from the login page) ───────────
+// Emails the account a single-use link to a change-password page. Always
+// resolves ok when the server is reachable (the server never reveals whether the
+// email is registered). Requires the backend — email can't be sent offline.
+function requestPasswordReset(email) {
+  return window.LlamitaApi.ready.then((ok) => {
+    if (!ok) return { error: 'Necesitas conexión para recuperar tu contraseña. Intenta más tarde.' };
+    return window.LlamitaApi.req('POST', '/api/auth/forgot-password', { email })
+      .then((j) => ({ ok: true, smtp: j.smtp !== false }))
+      .catch((e) => ({ error: window.LlamitaApi.errorMessage(e) }));
+  });
+}
+
+// Checks a reset token from the emailed link before showing the form.
+function checkResetToken(token) {
+  return window.LlamitaApi.req('GET', '/api/auth/reset-valid?token=' + encodeURIComponent(token))
+    .then(() => ({ ok: true }))
+    .catch((e) => ({ error: window.LlamitaApi.errorMessage(e), code: e && e.message }));
+}
+
+// Sets a new password using a reset token. On success every existing session is
+// revoked, so the user signs in fresh with the new password.
+function resetPassword(token, password) {
+  return window.LlamitaApi.req('POST', '/api/auth/reset-password', { token, password })
+    .then(() => ({ ok: true }))
+    .catch((e) => ({ error: window.LlamitaApi.errorMessage(e), code: e && e.message }));
+}
+
+// ─────────── Change password (in-app, while signed in) ───────────
+// Offline fallback: update the password stored in this browser's account list.
+function localChangePassword(currentPassword, newPassword) {
+  const sess = getSession();
+  if (!sess) return { error: 'No hay una sesión activa.' };
+  if ((newPassword || '').length < 6) return { error: 'La contraseña debe tener al menos 6 caracteres.' };
+  const accs = getAccounts();
+  const idx = accs.findIndex(a => a.id === sess.id);
+  if (idx < 0) return { error: 'Esta cuenta no está disponible en este dispositivo.' };
+  if (accs[idx].password !== currentPassword) return { error: 'La contraseña actual es incorrecta.' };
+  accs[idx].password = newPassword;
+  setAccounts(accs);
+  return { ok: true };
+}
+
+function changePassword(currentPassword, newPassword) {
+  return window.LlamitaApi.ready.then((ok) => {
+    if (!ok) return localChangePassword(currentPassword, newPassword);
+    return window.LlamitaApi.req('POST', '/api/auth/change-password', { currentPassword, newPassword })
+      .then(() => ({ ok: true }))
+      .catch((e) => ({ error: window.LlamitaApi.errorMessage(e), code: e && e.message }));
+  });
+}
+
 function signOut() {
   track('user_signed_out', {});
   // Revoke the server token (fire-and-forget) before clearing it locally.
@@ -243,6 +295,9 @@ function AuthScreen() {
   const [code, setCode] = React.useState('');
   const [resendWait, setResendWait] = React.useState(0);
   const [notice, setNotice] = React.useState(null);
+  // Forgot-password step (mode 'forgot'): sends a reset link to the email.
+  const [forgotSent, setForgotSent] = React.useState(false);
+  const [forgotSmtp, setForgotSmtp] = React.useState(true);
 
   React.useEffect(() => {
     if (resendWait <= 0) return;
@@ -280,6 +335,19 @@ function AuthScreen() {
         setMode('verify');
         reset();
       }
+    });
+  };
+
+  const onForgot = (e) => {
+    e && e.preventDefault();
+    reset();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { setErr('Ingresa un correo válido.'); return; }
+    setLoading(true);
+    requestPasswordReset(email).then((res) => {
+      setLoading(false);
+      if (res.error) { setErr(res.error); return; }
+      setForgotSmtp(res.smtp !== false);
+      setForgotSent(true);
     });
   };
 
@@ -441,7 +509,7 @@ function AuthScreen() {
           </div>
 
           {/* tab toggle */}
-          {mode !== 'verify' && <div style={{
+          {mode !== 'verify' && mode !== 'forgot' && <div style={{
             display: 'flex', gap: 0, padding: 3, borderRadius: 10,
             background: 'color-mix(in oklch, var(--c-border) 40%, transparent)',
             marginBottom: 22,
@@ -472,9 +540,67 @@ function AuthScreen() {
               </AField>
               <AButton type="submit" disabled={loading}>{loading ? 'Verificando…' : 'Iniciar sesión →'}</AButton>
               <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--c-muted)' }}>
-                ¿Olvidaste tu contraseña? <a href="#" onClick={e => e.preventDefault()} style={{ color: 'var(--c-accent)', textDecoration: 'none', fontWeight: 500 }}>Recupérala</a>
+                ¿Olvidaste tu contraseña? <a href="#" onClick={e => { e.preventDefault(); setMode('forgot'); setForgotSent(false); reset(); }} style={{ color: 'var(--c-accent)', textDecoration: 'none', fontWeight: 500 }}>Recupérala</a>
               </div>
             </form>
+          )}
+
+          {mode === 'forgot' && !forgotSent && (
+            <form onSubmit={onForgot} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{
+                width: 44, height: 44, borderRadius: 12,
+                background: 'color-mix(in oklch, var(--c-accent) 12%, var(--c-surface))',
+                border: '1px solid var(--c-border)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
+              }}>🔑</div>
+              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: '-0.01em' }}>Recupera tu contraseña</h2>
+              <p style={{ margin: '-6px 0 0', fontSize: 13, color: 'var(--c-muted)', lineHeight: 1.6 }}>
+                Ingresa el correo de tu cuenta y te enviaremos un enlace para elegir una nueva contraseña.
+              </p>
+              <AField label="Correo electrónico" error={err}>
+                <AInput type="email" value={email} onChange={setEmail} placeholder="tucorreo@ejemplo.com" autoComplete="email" autoFocus/>
+              </AField>
+              <AButton type="submit" disabled={loading}>{loading ? 'Enviando…' : 'Enviar enlace →'}</AButton>
+              <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--c-muted)' }}>
+                <a href="#" onClick={e => { e.preventDefault(); setMode('signin'); reset(); }}
+                   style={{ color: 'var(--c-accent)', textDecoration: 'none', fontWeight: 500 }}>
+                  ← Volver a iniciar sesión
+                </a>
+              </div>
+            </form>
+          )}
+
+          {mode === 'forgot' && forgotSent && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{
+                width: 44, height: 44, borderRadius: 12,
+                background: 'color-mix(in oklch, var(--c-accent) 12%, var(--c-surface))',
+                border: '1px solid var(--c-border)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
+              }}>✉️</div>
+              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: '-0.01em' }}>Revisa tu correo</h2>
+              <p style={{ margin: '-6px 0 0', fontSize: 13, color: 'var(--c-muted)', lineHeight: 1.6 }}>
+                Si <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--c-text)' }}>{email}</span> tiene
+                una cuenta en Llamita, te enviamos un enlace para restablecer tu contraseña. El enlace expira en 1 hora.
+              </p>
+              {!forgotSmtp && (
+                <div style={{
+                  padding: '8px 12px', borderRadius: 8, fontSize: 12, lineHeight: 1.5,
+                  background: 'color-mix(in oklch, var(--c-accent) 8%, var(--c-surface))',
+                  border: '1px solid var(--c-border)', color: 'var(--c-muted)',
+                }}>
+                  Modo desarrollo: el servidor no tiene correo configurado, el enlace aparece en la consola del servidor.
+                </div>
+              )}
+              <AButton onClick={() => { setMode('signin'); reset(); }}>Volver a iniciar sesión →</AButton>
+              <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--c-muted)' }}>
+                ¿No llegó?{' '}
+                <a href="#" onClick={e => { e.preventDefault(); setForgotSent(false); reset(); }}
+                   style={{ color: 'var(--c-accent)', textDecoration: 'none', fontWeight: 500 }}>
+                  Intentar de nuevo
+                </a>
+              </div>
+            </div>
           )}
 
           {mode === 'signup' && (
@@ -645,4 +771,189 @@ function AuthScreen() {
   );
 }
 
-window.LlamitaAuth = { useSession, signIn, signUp, verifyEmail, resendCode, signOut, getSession, getAccounts, AuthScreen };
+// ─────────── Reset-password screen (opened from the emailed link) ───────────
+// Standalone screen shown by reset-password.html. Reads the token from the URL,
+// validates it, then lets the user pick a new password.
+function ResetPasswordScreen() {
+  // step: checking | invalid | form | done
+  const [step, setStep] = React.useState('checking');
+  const [token, setToken] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [confirm, setConfirm] = React.useState('');
+  const [err, setErr] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    let t = '';
+    try { t = new URLSearchParams(window.location.search).get('token') || ''; } catch (e) {}
+    if (!t) { setStep('invalid'); return; }
+    setToken(t);
+    window.LlamitaApi.ready.then((ok) => {
+      if (!ok) { setStep('invalid'); return; }
+      checkResetToken(t).then((res) => setStep(res.ok ? 'form' : 'invalid'));
+    });
+  }, []);
+
+  const onSubmit = (e) => {
+    e && e.preventDefault();
+    setErr(null);
+    if (password.length < 6) { setErr('La contraseña debe tener al menos 6 caracteres.'); return; }
+    if (password !== confirm) { setErr('Las contraseñas no coinciden.'); return; }
+    setLoading(true);
+    resetPassword(token, password).then((res) => {
+      setLoading(false);
+      if (res.error) { setErr(res.error); if (res.code === 'invalid_reset_token') setStep('invalid'); return; }
+      setStep('done');
+    });
+  };
+
+  const Card = ({ children }) => (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px', background: 'var(--c-bg)' }}>
+      <div style={{ width: '100%', maxWidth: 380 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24, justifyContent: 'center' }}>
+          <img src="assets/brand/logo-horizontal.png" alt="Llamita" style={{ height: 40, width: 'auto', display: 'block' }} />
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+
+  if (step === 'checking') {
+    return <Card><p style={{ textAlign: 'center', fontSize: 13, color: 'var(--c-muted)' }}>Verificando el enlace…</p></Card>;
+  }
+
+  if (step === 'invalid') {
+    return (
+      <Card>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'color-mix(in oklch, var(--c-full) 12%, var(--c-surface))', border: '1px solid var(--c-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>⚠️</div>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: '-0.01em' }}>Enlace no válido</h2>
+          <p style={{ margin: '-6px 0 0', fontSize: 13, color: 'var(--c-muted)', lineHeight: 1.6 }}>
+            Este enlace de restablecimiento no es válido o ya expiró. Solicita uno nuevo desde la pantalla de inicio de sesión.
+          </p>
+          <AButton onClick={() => { window.location.href = '/app'; }}>Ir a iniciar sesión →</AButton>
+        </div>
+      </Card>
+    );
+  }
+
+  if (step === 'done') {
+    return (
+      <Card>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'color-mix(in oklch, var(--c-avail) 14%, var(--c-surface))', border: '1px solid var(--c-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>✅</div>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: '-0.01em' }}>Contraseña actualizada</h2>
+          <p style={{ margin: '-6px 0 0', fontSize: 13, color: 'var(--c-muted)', lineHeight: 1.6 }}>
+            Tu contraseña se cambió correctamente. Ya puedes iniciar sesión con tu nueva contraseña.
+          </p>
+          <AButton onClick={() => { window.location.href = '/app'; }}>Iniciar sesión →</AButton>
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: 'color-mix(in oklch, var(--c-accent) 12%, var(--c-surface))', border: '1px solid var(--c-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🔑</div>
+        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: '-0.01em' }}>Elige una nueva contraseña</h2>
+        <p style={{ margin: '-6px 0 0', fontSize: 13, color: 'var(--c-muted)', lineHeight: 1.6 }}>
+          Escribe tu nueva contraseña. Debe tener al menos 6 caracteres.
+        </p>
+        <AField label="Nueva contraseña">
+          <AInput type="password" value={password} onChange={setPassword} placeholder="mínimo 6 caracteres" autoComplete="new-password" autoFocus/>
+        </AField>
+        <AField label="Repite la contraseña" error={err}>
+          <AInput type="password" value={confirm} onChange={setConfirm} placeholder="repite la contraseña" autoComplete="new-password"/>
+        </AField>
+        <AButton type="submit" disabled={loading}>{loading ? 'Guardando…' : 'Guardar contraseña →'}</AButton>
+      </form>
+    </Card>
+  );
+}
+
+// ─────────── Change-password modal (in-app, while signed in) ───────────
+function ChangePasswordModal({ onClose }) {
+  const [current, setCurrent] = React.useState('');
+  const [next, setNext] = React.useState('');
+  const [confirm, setConfirm] = React.useState('');
+  const [err, setErr] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const [done, setDone] = React.useState(false);
+
+  React.useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const onSubmit = (e) => {
+    e && e.preventDefault();
+    setErr(null);
+    if (!current) { setErr('Ingresa tu contraseña actual.'); return; }
+    if (next.length < 6) { setErr('La nueva contraseña debe tener al menos 6 caracteres.'); return; }
+    if (next !== confirm) { setErr('Las contraseñas no coinciden.'); return; }
+    if (next === current) { setErr('La nueva contraseña debe ser diferente a la actual.'); return; }
+    setLoading(true);
+    changePassword(current, next).then((res) => {
+      setLoading(false);
+      if (res.error) { setErr(res.error); return; }
+      setDone(true);
+    });
+  };
+
+  return (
+    <div onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }} style={{
+      position: 'fixed', inset: 0, zIndex: 5000,
+      background: 'rgba(0,0,0,0.45)', display: 'flex',
+      alignItems: 'center', justifyContent: 'center', padding: 20,
+    }}>
+      <div style={{
+        width: '100%', maxWidth: 400, background: 'var(--c-surface)',
+        borderRadius: 14, border: '1px solid var(--c-border)',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.25)', padding: 24,
+        animation: 'llamita-fade 0.2s ease-out',
+      }}>
+        {done ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'color-mix(in oklch, var(--c-avail) 14%, var(--c-surface))', border: '1px solid var(--c-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>✅</div>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, letterSpacing: '-0.01em' }}>Contraseña actualizada</h2>
+            <p style={{ margin: '-6px 0 0', fontSize: 13, color: 'var(--c-muted)', lineHeight: 1.6 }}>
+              Tu contraseña se cambió correctamente. Se cerró la sesión en tus otros dispositivos.
+            </p>
+            <AButton onClick={onClose}>Listo</AButton>
+          </div>
+        ) : (
+          <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, letterSpacing: '-0.01em' }}>Cambiar contraseña</h2>
+              <button type="button" onClick={onClose} aria-label="Cerrar" style={{
+                background: 'none', border: 'none', cursor: 'pointer', fontSize: 20,
+                color: 'var(--c-muted)', lineHeight: 1, padding: 4,
+              }}>×</button>
+            </div>
+            <AField label="Contraseña actual">
+              <AInput type="password" value={current} onChange={setCurrent} placeholder="••••••••" autoComplete="current-password" autoFocus/>
+            </AField>
+            <AField label="Nueva contraseña">
+              <AInput type="password" value={next} onChange={setNext} placeholder="mínimo 6 caracteres" autoComplete="new-password"/>
+            </AField>
+            <AField label="Repite la nueva contraseña" error={err}>
+              <AInput type="password" value={confirm} onChange={setConfirm} placeholder="repite la contraseña" autoComplete="new-password"/>
+            </AField>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 2 }}>
+              <div style={{ display: 'grid' }}><AButton variant="ghost" onClick={onClose}>Cancelar</AButton></div>
+              <div style={{ display: 'grid' }}><AButton type="submit" disabled={loading}>{loading ? 'Guardando…' : 'Guardar'}</AButton></div>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+window.LlamitaAuth = {
+  useSession, signIn, signUp, verifyEmail, resendCode, signOut, getSession, getAccounts,
+  requestPasswordReset, checkResetToken, resetPassword, changePassword,
+  AuthScreen, ResetPasswordScreen, ChangePasswordModal,
+};

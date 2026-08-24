@@ -52,6 +52,7 @@ function FilterChip({ active, onClick, children }) {
 
 function UserMenu({ session, onSignOut }) {
   const [open, setOpen] = React.useState(false);
+  const [showPwd, setShowPwd] = React.useState(false);
   const ref = React.useRef(null);
   React.useEffect(() => {
     const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
@@ -59,8 +60,10 @@ function UserMenu({ session, onSignOut }) {
     return () => window.removeEventListener('mousedown', close);
   }, [open]);
   if (!session) return null;
+  const ChangePasswordModal = window.LlamitaAuth.ChangePasswordModal;
   return (
     <div ref={ref} style={{ position: 'relative' }}>
+      {showPwd && <ChangePasswordModal onClose={() => setShowPwd(false)} />}
       <button onClick={() => setOpen(o => !o)} style={{
         width: 34, height: 34, borderRadius: '50%',
         background: 'rgba(255,255,255,0.92)',
@@ -81,8 +84,17 @@ function UserMenu({ session, onSignOut }) {
             <div style={{ fontSize: 12, fontWeight: 600 }}>{session.name}</div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#888', marginTop: 2 }}>{session.email}</div>
           </div>
-          <button onClick={() => { setOpen(false); onSignOut(); }} style={{
+          <button onClick={() => { setOpen(false); setShowPwd(true); }} style={{
             width: '100%', textAlign: 'left', padding: '8px 10px', marginTop: 4,
+            background: 'transparent', border: 'none', borderRadius: 6,
+            fontFamily: 'var(--font-sans)', fontSize: 12, color: '#333',
+            cursor: 'pointer',
+          }} onMouseEnter={e => e.target.style.background = '#f5f5f5'}
+             onMouseLeave={e => e.target.style.background = 'transparent'}>
+            🔑 Cambiar contraseña
+          </button>
+          <button onClick={() => { setOpen(false); onSignOut(); }} style={{
+            width: '100%', textAlign: 'left', padding: '8px 10px',
             background: 'transparent', border: 'none', borderRadius: 6,
             fontFamily: 'var(--font-sans)', fontSize: 12, color: '#333',
             cursor: 'pointer',

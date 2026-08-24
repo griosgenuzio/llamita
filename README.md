@@ -25,7 +25,7 @@ npm install   # una sola vez — instala esbuild (solo desarrollo)
 npm run build # src/*.jsx → dist/*.js
 ```
 
-Variables de entorno opcionales: `PORT`, `LLAMITA_DB`, `LLAMITA_ADMIN_EMAIL`, `LLAMITA_ADMIN_PASSWORD` (cámbiala en producción).
+Variables de entorno opcionales: `PORT`, `LLAMITA_DB`, `LLAMITA_ADMIN_EMAIL`, `LLAMITA_ADMIN_PASSWORD` (cámbiala en producción), `LLAMITA_PUBLIC_URL` (URL pública para armar el enlace de restablecimiento; por defecto se usa el host de la petición — defínela cuando el frontend corre en otro origen).
 
 ## Verificación de correo al registrarse
 
@@ -54,6 +54,11 @@ Usa el puerto 443, así que funciona en hosts que bloquean SMTP saliente (como R
 | `LLAMITA_SMTP_FROM` | remitente (por defecto igual a `LLAMITA_SMTP_USER`) |
 
 Sin ninguna de las dos opciones el servidor funciona en **modo desarrollo**: imprime el código en la consola del servidor en vez de enviarlo por correo (la pantalla de verificación lo avisa).
+
+## Cambio y recuperación de contraseña
+
+- **Recuperar contraseña (desde el login).** En "Iniciar sesión" → "¿Olvidaste tu contraseña? Recupérala", el usuario ingresa su correo y el servidor le envía un enlace de un solo uso a una página para elegir una nueva contraseña (`/reset-password`). El enlace expira en 1 hora. Por seguridad la respuesta es siempre la misma exista o no la cuenta. Al restablecer, se cierran todas las sesiones de esa cuenta. Usa la misma configuración de correo (Brevo/SMTP) que la verificación; en modo desarrollo el enlace se imprime en la consola.
+- **Cambiar contraseña (dentro de la app).** Con la sesión iniciada, el menú de usuario (conductor y operador) tiene "🔑 Cambiar contraseña", que abre una ventana donde se confirma la contraseña actual y se define la nueva. Se cierran las demás sesiones y se mantiene la actual. La cuenta de administración no aplica: su contraseña se define por variable de entorno.
 
 ## Verificación de operadores y parqueos
 

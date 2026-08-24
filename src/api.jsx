@@ -87,6 +87,10 @@
   function errorMessage(e) {
     var map = {
       invalid_credentials: 'Correo o contraseña incorrectos.',
+      invalid_password: 'La contraseña actual es incorrecta.',
+      invalid_reset_token: 'El enlace de restablecimiento no es válido o ya expiró. Solicita uno nuevo.',
+      admin_password_env: 'La contraseña de administración se configura en el servidor.',
+      unauthorized: 'Tu sesión expiró. Vuelve a iniciar sesión.',
       email_taken: 'Ya existe una cuenta con ese correo.',
       invalid_email: 'Correo no válido.',
       weak_password: 'La contraseña debe tener al menos 6 caracteres.',
