@@ -10,10 +10,13 @@
 //   LLAMITA_DB              path to the SQLite file      (default server/llamita.db)
 //   LLAMITA_ADMIN_EMAIL     platform-owner login         (default admin@llamita.bo)
 //   LLAMITA_ADMIN_PASSWORD  platform-owner password      (default llamita2026 — CHANGE IN PRODUCTION)
+//   LLAMITA_PUBLIC_URL      public app URL for reset links (default: request host;
+//                           set this when the frontend runs on a different origin)
 //
-// Email verification — codes are sent via Brevo's HTTP API (preferred; works
-// on hosts that block outbound SMTP, e.g. Railway) or SMTP. With neither
-// configured, codes are printed to this console instead (development mode).
+// Email verification codes and password-reset links are sent via Brevo's HTTP
+// API (preferred; works on hosts that block outbound SMTP, e.g. Railway) or
+// SMTP. With neither configured, they are printed to this console instead
+// (development mode).
 //
 //   Brevo HTTP API (recommended):
 //   LLAMITA_BREVO_API_KEY   transactional API key from brevo.com
@@ -63,6 +66,12 @@ const MAIL_ENABLED = BREVO_ENABLED || SMTP_ENABLED;
 const CODE_TTL_MS = 10 * 60 * 1000;   // verification code lifetime
 const RESEND_COOLDOWN_MS = 60 * 1000; // min. gap between emails to one signup
 const MAX_CODE_ATTEMPTS = 5;
+const RESET_TTL_MS = 60 * 60 * 1000;  // password-reset link lifetime (1 hour)
+
+// Public base URL used to build the reset link emailed to users. Defaults to the
+// request's own host (correct when this server also serves the frontend); set
+// LLAMITA_PUBLIC_URL when the frontend is hosted on a different origin.
+const PUBLIC_URL = (process.env.LLAMITA_PUBLIC_URL || '').replace(/\/$/, '');
 
 // Verification uploads (operator ID docs + lot photos). Files live on disk
 // beside the DB (the Railway volume); only references are stored in SQLite.
@@ -190,6 +199,20 @@ db.exec(`
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
+  -- Forgot-password flow. A row holds the sha256 of the emailed reset token
+  -- (never the token itself). The link stays valid until expires_at or until
+  -- used_at is stamped (single use).
+  CREATE TABLE IF NOT EXISTS password_resets (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL,
+    token_hash   TEXT NOT NULL,
+    expires_at   TEXT NOT NULL,
+    used_at      TEXT,
+    last_sent_at TEXT NOT NULL,
+    created_at   TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets (token_hash);
+  CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets (user_id);
 `);
 db.prepare(`INSERT OR IGNORE INTO app_state (id, version, data)
             VALUES (1, 0, '{"lots":[],"sessions":[],"history":[]}')`).run();
@@ -408,6 +431,29 @@ async function sendVerificationCode(email, code) {
   if (BREVO_ENABLED) return brevoSend(email, subject, text);
   if (SMTP_ENABLED)  return smtpSend(email, subject, text);
   console.log(`[llamita] Código de verificación para ${email}: ${code}  (email no configurado — modo desarrollo)`);
+}
+
+// Builds the app's public base URL, preferring LLAMITA_PUBLIC_URL, then the
+// forwarded/host headers (works behind a proxy), then localhost.
+function baseUrl(req) {
+  if (PUBLIC_URL) return PUBLIC_URL;
+  const proto = (req.headers['x-forwarded-proto'] || '').split(',')[0].trim() || 'http';
+  const host = (req.headers['x-forwarded-host'] || req.headers['host'] || `localhost:${PORT}`).split(',')[0].trim();
+  return `${proto}://${host}`;
+}
+
+// Emails a password-reset link, or — when no mail is configured — prints it to
+// the console (development mode).
+async function sendPasswordResetLink(email, link) {
+  const subject = 'Restablece tu contraseña de Llamita';
+  const text =
+    `Hola,\n\nRecibimos una solicitud para restablecer la contraseña de tu cuenta de Llamita.\n\n` +
+    `Abre este enlace para elegir una nueva contraseña:\n\n${link}\n\n` +
+    `El enlace expira en 1 hora y solo puede usarse una vez. Si no solicitaste este cambio, ` +
+    `ignora este correo; tu contraseña seguirá igual.\n\n— Llamita · Parqueos en La Paz`;
+  if (BREVO_ENABLED) return brevoSend(email, subject, text);
+  if (SMTP_ENABLED)  return smtpSend(email, subject, text);
+  console.log(`[llamita] Enlace de restablecimiento para ${email}: ${link}  (email no configurado — modo desarrollo)`);
 }
 
 // Returns { id, name, role } for a valid Bearer token, else null.
@@ -703,6 +749,89 @@ async function handleApi(req, res, pathname) {
     const h = req.headers['authorization'] || '';
     const m = /^Bearer\s+(.+)$/i.exec(h);
     if (m) db.prepare('DELETE FROM tokens WHERE token = ?').run(m[1]);
+    return json(res, 200, { ok: true });
+  }
+
+  // ── Forgot password: email a reset link ──
+  // Always responds 200 so an attacker can't probe which emails are registered.
+  if (pathname === '/api/auth/forgot-password' && method === 'POST') {
+    const b = await readBody(req);
+    const email = String(b.email || '').toLowerCase().trim();
+    const respond = () => json(res, 200, { ok: true, smtp: MAIL_ENABLED });
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return respond();
+    // The admin credential is env-configured and has no resettable DB row.
+    if (email === ADMIN_EMAIL) return respond();
+    const user = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+    if (!user) return respond();
+    // Housekeeping + light anti-spam: drop expired rows, and skip re-sending if a
+    // link for this user was emailed within the cooldown window.
+    db.prepare('DELETE FROM password_resets WHERE expires_at < ?').run(nowIso());
+    const recent = db.prepare('SELECT last_sent_at FROM password_resets WHERE user_id = ? AND used_at IS NULL ORDER BY last_sent_at DESC LIMIT 1').get(user.id);
+    if (recent && Date.now() - Date.parse(recent.last_sent_at) < RESEND_COOLDOWN_MS) return respond();
+    db.prepare('DELETE FROM password_resets WHERE user_id = ?').run(user.id);
+    const token = crypto.randomBytes(32).toString('hex');
+    const link = `${baseUrl(req)}/reset-password?token=${token}`;
+    try {
+      await sendPasswordResetLink(email, link);
+    } catch (e) {
+      console.error(`[llamita] Error enviando enlace de restablecimiento a ${email}:`, e.message);
+      return respond(); // don't leak the failure (would reveal the email exists)
+    }
+    db.prepare(`INSERT INTO password_resets (id,user_id,token_hash,expires_at,used_at,last_sent_at,created_at)
+                VALUES (?,?,?,?,NULL,?,?)`)
+      .run(uid('pr'), user.id, hashCode(token, ''),
+           new Date(Date.now() + RESET_TTL_MS).toISOString(), nowIso(), nowIso());
+    return respond();
+  }
+
+  // ── Check a reset token is still usable (so the page can show the form or an
+  // "expired" message before the user types a new password). ──
+  if (pathname === '/api/auth/reset-valid' && method === 'GET') {
+    const q = new URL(req.url, 'http://x').searchParams;
+    const token = String(q.get('token') || '');
+    const row = token && db.prepare('SELECT expires_at, used_at FROM password_resets WHERE token_hash = ?').get(hashCode(token, ''));
+    if (!row || row.used_at || row.expires_at < nowIso()) return json(res, 400, { error: 'invalid_reset_token' });
+    return json(res, 200, { ok: true });
+  }
+
+  // ── Apply a new password via a reset token. ──
+  if (pathname === '/api/auth/reset-password' && method === 'POST') {
+    const b = await readBody(req);
+    const token = String(b.token || '');
+    if (String(b.password || '').length < 6) return json(res, 400, { error: 'weak_password' });
+    const row = token && db.prepare('SELECT * FROM password_resets WHERE token_hash = ?').get(hashCode(token, ''));
+    if (!row || row.used_at || row.expires_at < nowIso()) return json(res, 400, { error: 'invalid_reset_token' });
+    const u = db.prepare('SELECT id FROM users WHERE id = ?').get(row.user_id);
+    if (!u) { db.prepare('DELETE FROM password_resets WHERE id = ?').run(row.id); return json(res, 400, { error: 'invalid_reset_token' }); }
+    const salt = crypto.randomBytes(16).toString('hex');
+    db.prepare('UPDATE users SET password_hash = ?, password_salt = ? WHERE id = ?')
+      .run(hashPassword(b.password, salt), salt, u.id);
+    db.prepare('UPDATE password_resets SET used_at = ? WHERE id = ?').run(nowIso(), row.id);
+    db.prepare('DELETE FROM password_resets WHERE user_id = ? AND used_at IS NULL').run(u.id);
+    // Sign the user out everywhere: any existing session tokens are now stale.
+    db.prepare('DELETE FROM tokens WHERE user_id = ?').run(u.id);
+    return json(res, 200, { ok: true });
+  }
+
+  // ── Change password while signed in (verifies the current password). ──
+  if (pathname === '/api/auth/change-password' && method === 'POST') {
+    const who = authFrom(req);
+    if (!who) return json(res, 401, { error: 'unauthorized' });
+    if (who.id === 'admin') return json(res, 403, { error: 'admin_password_env' });
+    const b = await readBody(req);
+    if (String(b.newPassword || '').length < 6) return json(res, 400, { error: 'weak_password' });
+    const u = db.prepare('SELECT password_hash, password_salt FROM users WHERE id = ?').get(who.id);
+    if (!u) return json(res, 404, { error: 'not_found' });
+    if (hashPassword(String(b.currentPassword || ''), u.password_salt) !== u.password_hash) {
+      return json(res, 401, { error: 'invalid_password' });
+    }
+    const salt = crypto.randomBytes(16).toString('hex');
+    db.prepare('UPDATE users SET password_hash = ?, password_salt = ? WHERE id = ?')
+      .run(hashPassword(b.newPassword, salt), salt, who.id);
+    // Keep the caller's current session valid; revoke every other session token.
+    const h = req.headers['authorization'] || '';
+    const m = /^Bearer\s+(.+)$/i.exec(h);
+    if (m) db.prepare('DELETE FROM tokens WHERE user_id = ? AND token != ?').run(who.id, m[1]);
     return json(res, 200, { ok: true });
   }
 
