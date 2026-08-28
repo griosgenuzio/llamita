@@ -130,14 +130,16 @@ function LeafletParkingMap({ lots, selectedId, onSelect, filterFn, pulseLotId, u
       preferCanvas: true,
     });
 
-    // Voyager basemap: shows more street names, neighborhood + district labels
-    // and POIs (malls) than light_all — easier for drivers to orient quickly.
+    // OpenStreetMap standard basemap: keyless (no API key / watermark) and rich
+    // in street names + labels, so drivers can orient quickly. CARTO's Voyager
+    // tiles now require an API key, which stamped an "API KEY REQUIRED" watermark
+    // over the map — OSM avoids that entirely.
     L.tileLayer(
-      'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
       {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © CARTO',
-        subdomains:  'abcd',
-        maxZoom:     20,
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        subdomains:  'abc',
+        maxZoom:     19,
       }
     ).addTo(map);
 
