@@ -130,23 +130,20 @@ function LeafletParkingMap({ lots, selectedId, onSelect, filterFn, pulseLotId, u
       preferCanvas: true,
     });
 
-    // Esri Light Gray Canvas — keyless (no API key / watermark) and deliberately
-    // minimal: muted land, roads, and a separate label overlay (place +
-    // neighborhood names, major road names, a few big references), with no
-    // buildings/POI clutter. Two layers: the gray base, then the reference labels
-    // on top. Native tiles go to z16; maxZoom 19 lets Leaflet upscale past that
-    // so zooming in never shows blank tiles.
-    //
-    // (Standard OSM raster tiles bake every POI/building into the image and can't
-    // be decluttered; CARTO's cleaner Positron/Voyager basemaps now need a key.)
-    var esriAttr = 'Tiles © <a href="https://www.esri.com/">Esri</a> — Esri, HERE, Garmin, © OpenStreetMap contributors';
+    // CARTO Voyager basemap: clean cartography with street names, neighborhood
+    // and district labels and a few big references — easy for drivers to orient.
+    // CARTO now requires a free API key for these tiles (unauthenticated requests
+    // are stamped with an "API KEY REQUIRED" watermark). Set the key once in
+    // app.html as window.LLAMITA_CARTO_KEY; it's appended as ?key=… on each tile.
+    var cartoKey = (window.LLAMITA_CARTO_KEY || '').trim();
+    var keyParam = cartoKey ? ('?key=' + encodeURIComponent(cartoKey)) : '';
     L.tileLayer(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
-      { attribution: esriAttr, maxNativeZoom: 16, maxZoom: 19 }
-    ).addTo(map);
-    L.tileLayer(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
-      { maxNativeZoom: 16, maxZoom: 19 }
+      'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png' + keyParam,
+      {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © CARTO',
+        subdomains:  'abcd',
+        maxZoom:     20,
+      }
     ).addTo(map);
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);
