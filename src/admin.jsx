@@ -410,7 +410,12 @@ function AdmMapPicker({ value, onPick }) {
   React.useEffect(function() {
     if (!ref.current || mapRef.current || typeof L === 'undefined') return;
     var map = L.map(ref.current, { center: [-16.505, -68.117], zoom: 13, preferCanvas: true });
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 20 }).addTo(map);
+    // CARTO basemap key (injected into app.html from the LLAMITA_CARTO_KEY env var);
+    // ignore an unreplaced placeholder in pure-static mode.
+    var cartoKey = (window.LLAMITA_CARTO_KEY || '').trim();
+    if (cartoKey.indexOf('__') === 0) cartoKey = '';
+    var keyParam = cartoKey ? ('?key=' + encodeURIComponent(cartoKey)) : '';
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png' + keyParam, { subdomains: 'abcd', maxZoom: 20 }).addTo(map);
     map.on('click', function(e) { onPick({ lat: e.latlng.lat, lng: e.latlng.lng }); });
     mapRef.current = map;
     var t = setTimeout(function() { map.invalidateSize(); }, 60);
