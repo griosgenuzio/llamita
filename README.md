@@ -25,7 +25,15 @@ npm install   # una sola vez — instala esbuild (solo desarrollo)
 npm run build # src/*.jsx → dist/*.js
 ```
 
-Variables de entorno opcionales: `PORT`, `LLAMITA_DB`, `LLAMITA_ADMIN_EMAIL`, `LLAMITA_ADMIN_PASSWORD` (cámbiala en producción), `LLAMITA_PUBLIC_URL` (URL pública para armar el enlace de restablecimiento; por defecto se usa el host de la petición — defínela cuando el frontend corre en otro origen).
+Variables de entorno opcionales: `PORT`, `LLAMITA_DB`, `LLAMITA_ADMIN_EMAIL`, `LLAMITA_ADMIN_PASSWORD` (cámbiala en producción), `LLAMITA_PUBLIC_URL` (URL pública para armar el enlace de restablecimiento; por defecto se usa el host de la petición — defínela cuando el frontend corre en otro origen), `LLAMITA_CARTO_KEY` (ver abajo).
+
+## Mapa base (CARTO)
+
+El mapa del conductor usa las teselas **Voyager de CARTO**, que ahora requieren una API key gratuita (sin ella el mapa muestra una marca de agua «API KEY REQUIRED»).
+
+- Consigue una key en [carto.com/basemaps/apikey](https://carto.com/basemaps/apikey) (gratis hasta ~5 millones de teselas al mes, no requiere cuenta) y **restríngela a tu dominio** (`parqueosllamita.com`) en el panel de CARTO.
+- **No la pongas en el código.** Defínela como variable de entorno `LLAMITA_CARTO_KEY` (en Railway, o como secreto de GitHub). El servidor la inyecta en `app.html` reemplazando el marcador `__LLAMITA_CARTO_KEY__` al servir la página. Es seguro que aparezca en el HTML del cliente: la protección es la restricción por dominio, no el secreto.
+- Sin la variable el mapa funciona igual pero con la marca de agua (modo desarrollo).
 
 ## Verificación de correo al registrarse
 

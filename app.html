@@ -61,6 +61,13 @@
     </div>
   </div>
 
+  <!-- CARTO basemap API key. NOT stored in the repo: set the LLAMITA_CARTO_KEY
+       env var (Railway / GitHub secret) and the server injects it here in place
+       of the __LLAMITA_CARTO_KEY__ placeholder when it serves this page. Get a
+       free key at https://carto.com/basemaps/apikey and restrict it to your
+       domain. If unset, the map shows an "API KEY REQUIRED" watermark. -->
+  <script>window.LLAMITA_CARTO_KEY = '__LLAMITA_CARTO_KEY__';</script>
+
   <script src="/vendor/react.js" integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z" crossorigin="anonymous"></script>
   <script src="/vendor/react-dom.js" integrity="sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
