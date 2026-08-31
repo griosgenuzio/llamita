@@ -543,10 +543,10 @@ function AdminApp({ store, session, onSignOut }) {
   }
 
   function downloadUsers() {
-    var rows = [['ID','Nombre','Correo','Rol','Registrado','Usos efectivos','Eventos totales','Última actividad']].concat(
+    var rows = [['ID','Nombre','Correo','Teléfono','Rol','Registrado','Usos efectivos','Eventos totales','Última actividad']].concat(
       accounts.map(function(u) {
         var s = userStats(u);
-        return [u.id, u.name, u.email, u.role, u.createdAt || '', s.effective, s.total, s.last || ''];
+        return [u.id, u.name, u.email, u.phone || '', u.role, u.createdAt || '', s.effective, s.total, s.last || ''];
       })
     );
     admDownloadCSV(rows, 'llamita-usuarios-' + new Date().toISOString().slice(0,10) + '.csv');
@@ -652,7 +652,7 @@ function AdminApp({ store, session, onSignOut }) {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
                 <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                  <th style={ADM_TH}>Nombre</th><th style={ADM_TH}>Correo</th><th style={ADM_TH}>Rol</th>
+                  <th style={ADM_TH}>Nombre</th><th style={ADM_TH}>Correo</th><th style={ADM_TH}>Teléfono</th><th style={ADM_TH}>Rol</th>
                   <th style={ADM_TH}>Registrado</th>
                   <th style={Object.assign({}, ADM_TH, { textAlign: 'right' })}>Usos efectivos</th>
                   <th style={Object.assign({}, ADM_TH, { textAlign: 'right' })}>Eventos</th>
@@ -662,7 +662,7 @@ function AdminApp({ store, session, onSignOut }) {
               </thead>
               <tbody>
                 {accounts.length === 0 && (
-                  <tr><td colSpan="8" style={{ padding: 28, textAlign: 'center', color: '#bbb', fontSize: 12 }}>Aún no hay cuentas registradas</td></tr>
+                  <tr><td colSpan="9" style={{ padding: 28, textAlign: 'center', color: '#bbb', fontSize: 12 }}>Aún no hay cuentas registradas</td></tr>
                 )}
                 {accounts.map(function(u) {
                   var s = userStats(u);
@@ -670,6 +670,7 @@ function AdminApp({ store, session, onSignOut }) {
                     <tr key={u.id} style={{ borderBottom: '1px solid #f8f8f8' }}>
                       <td style={Object.assign({}, ADM_TD, { fontWeight: 600, color: '#111' })}>{u.name}</td>
                       <td style={Object.assign({}, ADM_TD, { fontFamily: 'var(--font-mono)', fontSize: 11, color: '#888' })}>{u.email}</td>
+                      <td style={Object.assign({}, ADM_TD, { fontFamily: 'var(--font-mono)', fontSize: 11, color: u.phone ? '#555' : '#ccc' })}>{u.phone || '—'}</td>
                       <td style={ADM_TD}><RolePill role={u.role}/></td>
                       <td style={Object.assign({}, ADM_TD, { fontFamily: 'var(--font-mono)', fontSize: 11, color: '#aaa' })}>{u.createdAt || '—'}</td>
                       <td style={Object.assign({}, ADM_TD, { textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--c-accent)' })}>{s.effective}</td>
