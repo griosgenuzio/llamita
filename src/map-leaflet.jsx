@@ -136,6 +136,9 @@ function LeafletParkingMap({ lots, selectedId, onSelect, filterFn, pulseLotId, u
     // are stamped with an "API KEY REQUIRED" watermark). Set the key once in
     // app.html as window.LLAMITA_CARTO_KEY; it's appended as ?key=… on each tile.
     var cartoKey = (window.LLAMITA_CARTO_KEY || '').trim();
+    // Ignore an unreplaced server placeholder (e.g. opened as pure static files
+    // with no backend to inject the key).
+    if (cartoKey.indexOf('__') === 0) cartoKey = '';
     var keyParam = cartoKey ? ('?key=' + encodeURIComponent(cartoKey)) : '';
     L.tileLayer(
       'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png' + keyParam,

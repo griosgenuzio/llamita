@@ -12,6 +12,9 @@
 //   LLAMITA_ADMIN_PASSWORD  platform-owner password      (default llamita2026 — CHANGE IN PRODUCTION)
 //   LLAMITA_PUBLIC_URL      public app URL for reset links (default: request host;
 //                           set this when the frontend runs on a different origin)
+//   LLAMITA_CARTO_KEY       CARTO basemap API key, injected into served HTML so
+//                           the map has no "API KEY REQUIRED" watermark
+//                           (free key at carto.com/basemaps/apikey)
 //
 // Email verification codes and password-reset links are sent via Brevo's HTTP
 // API (preferred; works on hosts that block outbound SMTP, e.g. Railway) or
@@ -72,6 +75,13 @@ const RESET_TTL_MS = 60 * 60 * 1000;  // password-reset link lifetime (1 hour)
 // request's own host (correct when this server also serves the frontend); set
 // LLAMITA_PUBLIC_URL when the frontend is hosted on a different origin.
 const PUBLIC_URL = (process.env.LLAMITA_PUBLIC_URL || '').replace(/\/$/, '');
+
+// CARTO basemap API key. Kept OUT of the repo: set it as an env var (Railway /
+// GitHub secret). It's injected into served HTML in place of the
+// __LLAMITA_CARTO_KEY__ placeholder, so the map loads authenticated with no
+// "API KEY REQUIRED" watermark. Safe to expose in client HTML — restrict the key
+// to your domain in the CARTO dashboard. Empty = dev/no key (map shows watermark).
+const CARTO_KEY = process.env.LLAMITA_CARTO_KEY || '';
 
 // Verification uploads (operator ID docs + lot photos). Files live on disk
 // beside the DB (the Railway volume); only references are stored in SQLite.
@@ -1359,7 +1369,13 @@ function serveStatic(req, res, pathname) {
     if (i >= candidates.length) { res.writeHead(404); res.end('not found'); return; }
     fs.readFile(candidates[i], (err, data) => {
       if (err) { trySend(i + 1); return; }
-      res.writeHead(200, { 'Content-Type': MIME[path.extname(candidates[i]).toLowerCase()] || 'application/octet-stream' });
+      const ext = path.extname(candidates[i]).toLowerCase();
+      // Inject the CARTO key (from the env var) into HTML pages, replacing the
+      // __LLAMITA_CARTO_KEY__ placeholder. Keeps the key out of the repo.
+      if (ext === '.html' && data.includes('__LLAMITA_CARTO_KEY__')) {
+        data = Buffer.from(data.toString('utf8').split('__LLAMITA_CARTO_KEY__').join(CARTO_KEY), 'utf8');
+      }
+      res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
       res.end(data);
     });
   };
