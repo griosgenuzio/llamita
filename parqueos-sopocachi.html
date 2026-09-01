@@ -73,6 +73,15 @@
 
     <section class="hero">
       <h1>Parqueos en Sopocachi, en tiempo real</h1>
+      <div class="zstats">
+        <div class="zstat"><div class="n" id="z-lots">—</div><div class="l">Parqueos publicados</div></div>
+        <div class="zstat"><div class="n" id="z-refs">—</div><div class="l">Visitados por Llamita</div></div>
+        <div class="zstat"><div class="n" id="z-free">—</div><div class="l">Cupos libres ahora</div></div>
+      </div>
+      <div class="zactions">
+        <a class="btn btn-lima" href="/app">Encuentra parqueo →</a>
+        <a class="btn btn-outline" href="/app">Tengo un parqueo</a>
+      </div>
       <p class="lead">Sopocachi vive de sus restaurantes, cafés y oficinas alrededor de la <strong>Plaza Avaroa</strong> y la <strong>Av. 20 de Octubre</strong>. Llamita te muestra qué parqueos tienen espacio libre <em>ahora</em>.</p>
       <div class="legend">
         <span><span class="dot" style="background:var(--avail)"></span>Hay espacio libre</span>
@@ -136,4 +145,7 @@
       </div>
     </div>
   </footer>
+
+  <script src="/assets/zones.js"></script>
+  <script>window.LlamitaZones.renderZonePage('Sopocachi');</script>
 </body></html>

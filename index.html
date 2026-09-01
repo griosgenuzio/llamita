@@ -148,10 +148,12 @@
     .stat .lbl { margin-top:10px; font-size:14.5px; color:rgba(255,255,255,.82); }
     .zonestats { margin-top:20px; background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px 26px; }
     .zonegrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; }
-    .zonecard { display:flex; align-items:baseline; justify-content:space-between; gap:8px; background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:12px 14px; }
+    .zonecard { display:flex; align-items:baseline; justify-content:space-between; gap:8px; background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:12px 14px; color:inherit; text-decoration:none; transition:border-color .12s ease, transform .12s ease, box-shadow .12s ease; }
+    a.zonecard:hover { border-color:var(--verde); transform:translateY(-1px); box-shadow:0 4px 14px rgba(5,46,34,.08); }
     .zonecard .z { font-size:14px; color:var(--ink); font-weight:500; }
     .zonecard .c { font-family:var(--mono); font-weight:700; font-size:19px; color:var(--avail); }
     .zonecard.full .c { color:var(--full); }
+    .zonecard.none .c { color:var(--muted); }
     @media (max-width:560px){ .stat { padding:18px 14px; } .stat .num { font-size:30px; } .stat .lbl { font-size:12px; } }
     .steps { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:34px; }
     .step { background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:24px; }
@@ -307,17 +309,6 @@
           <a class="btn btn-lima" href="/app">Publicar mi parqueo →</a>
         </div>
       </div>
-
-      <!-- Zones -->
-      <div class="zones">
-        <p class="eyebrow" style="margin:0">Cobertura</p>
-        <h2 class="title" style="font-size:22px; margin:6px 0 0">Zonas de La Paz y El Alto</h2>
-        <div class="chips">
-          <a href="/parqueos-centro-la-paz">Centro</a><span>San Pedro</span><a href="/parqueos-sopocachi">Sopocachi</a><span>Miraflores</span>
-          <span>San Miguel</span><span>Calacoto</span><a href="/parqueos-obrajes">Obrajes</a><span>Zona Sur</span>
-          <span>Cota Cota</span><span>El Alto</span>
-        </div>
-      </div>
     </div>
   </section>
 
@@ -383,62 +374,7 @@
   </footer>
   <script>document.getElementById('yr').textContent=new Date().getFullYear();</script>
 
-  <!-- Live stats: pull the shared state and show real coverage/availability. -->
-  <script>
-  (function(){
-    // La Paz neighborhoods, each with an approximate center. A lot is assigned to
-    // the NEAREST center by its GPS coordinates — reliable regardless of how the
-    // address was typed. Centers are approximate and easy to fine-tune.
-    // (A future operator/admin `zone` field, when set on a lot, overrides this.)
-    var ZONES = [
-      { name:'Centro',            lat:-16.4960, lng:-68.1336 },
-      { name:'San Pedro',         lat:-16.5075, lng:-68.1345 },
-      { name:'San Jorge',         lat:-16.5030, lng:-68.1290 },
-      { name:'Sopocachi',         lat:-16.5115, lng:-68.1280 },
-      { name:'Miraflores',        lat:-16.4995, lng:-68.1190 },
-      { name:'Obrajes',           lat:-16.5270, lng:-68.1030 },
-      { name:'Calacoto',          lat:-16.5400, lng:-68.0880 },
-      { name:'San Miguel',        lat:-16.5465, lng:-68.0770 },
-      { name:'Irpavi / Achumani', lat:-16.5430, lng:-68.0630 },
-      { name:'Cota Cota',         lat:-16.5560, lng:-68.0680 },
-      { name:'El Alto',           lat:-16.5040, lng:-68.1630 }
-    ];
-    var KX = 0.9588;            // cos(16.5°): scale longitude so distances are fair
-    var MAX_D2 = 0.05 * 0.05;   // ~5.5 km: farther than this from every center → "Otras zonas"
-    function setNum(id,v){ var el=document.getElementById(id); if(el) el.textContent=v; }
-    function free(l){ return Math.max(0,(l.total||0)-(l.occupied||0)); }
-    function hide(){ var s=document.getElementById('cifras'); if(s) s.style.display='none'; }
-    function zoneOf(l){
-      if (l.zone) return l.zone; // explicit override (future dropdown) wins
-      if (typeof l.lat !== 'number' || typeof l.lng !== 'number') return 'Otras zonas';
-      var best='Otras zonas', bestD=Infinity;
-      for (var i=0;i<ZONES.length;i++){
-        var dlat=l.lat-ZONES[i].lat, dlng=(l.lng-ZONES[i].lng)*KX, d=dlat*dlat+dlng*dlng;
-        if (d<bestD){ bestD=d; best=ZONES[i].name; }
-      }
-      return bestD<=MAX_D2 ? best : 'Otras zonas';
-    }
-    fetch('/api/state').then(function(r){ return r.ok?r.json():null; }).then(function(j){
-      if(!j||!j.state||!Array.isArray(j.state.lots)){ hide(); return; }
-      var lots = j.state.lots.filter(function(l){ return l && l.status==='approved'; });
-      var std  = lots.filter(function(l){ return l.kind!=='reference'; });
-      var refs = lots.filter(function(l){ return l.kind==='reference'; });
-      setNum('stat-lots', std.length);
-      setNum('stat-refs', refs.length);
-      setNum('stat-free', std.reduce(function(a,l){ return a+free(l); },0));
-      // Free spots grouped by neighborhood (assigned by GPS). Show only zones that
-      // actually have a lot, ordered by the ZONES list (with "Otras zonas" last).
-      var byZone={};
-      std.forEach(function(l){ var z=zoneOf(l); byZone[z]=(byZone[z]||0)+free(l); });
-      var order=ZONES.map(function(z){ return z.name; }).concat(['Otras zonas'])
-                     .filter(function(z){ return z in byZone; });
-      var grid=document.getElementById('zone-grid');
-      if(grid){
-        grid.innerHTML = order.length
-          ? order.map(function(z){ var c=byZone[z]; return '<div class="zonecard'+(c===0?' full':'')+'"><span class="z">'+z+'</span><span class="c">'+c+'</span></div>'; }).join('')
-          : '<div style="color:var(--muted);font-size:14px">Sumando parqueos en la ciudad…</div>';
-      }
-    }).catch(hide);
-  })();
-  </script>
+  <!-- Live stats: shared module fills #stat-* totals and the linked zone cards. -->
+  <script src="/assets/zones.js"></script>
+  <script>window.LlamitaZones.renderLanding();</script>
 </body></html>
