@@ -62,13 +62,16 @@
       setNum('stat-lots', res.totals.published);
       setNum('stat-refs', res.totals.refs);
       setNum('stat-free', res.totals.free);
+      // Only show a zone once it has at least one PUBLISHED lot. Zones with only
+      // reference lots (visited by Llamita, none posted yet) stay off the landing
+      // — their pages are still reachable by search / direct URL.
       var order = ZONES.map(function (z) { return z.name; }).concat(['Otras zonas'])
-        .filter(function (n) { var b = res.byZone[n]; return b && (b.published + b.refs) > 0; });
+        .filter(function (n) { var b = res.byZone[n]; return b && b.published > 0; });
       var grid = document.getElementById('zone-grid');
       if (!grid) return;
       grid.innerHTML = order.length ? order.map(function (n) {
         var b = res.byZone[n], slug = slugOf(n);
-        var cls = b.published > 0 && b.free === 0 ? ' full' : (b.published === 0 ? ' none' : '');
+        var cls = b.free === 0 ? ' full' : '';
         var inner = '<span class="z">' + n + '</span><span class="c">' + b.free + '</span>';
         return slug ? '<a class="zonecard' + cls + '" href="/' + slug + '">' + inner + '</a>'
                     : '<div class="zonecard' + cls + '">' + inner + '</div>';
