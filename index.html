@@ -386,11 +386,38 @@
   <!-- Live stats: pull the shared state and show real coverage/availability. -->
   <script>
   (function(){
-    var ZONES = ['Centro','San Pedro','Sopocachi','Miraflores','San Miguel','Calacoto','Obrajes','Cota Cota','El Alto','Zona Sur'];
-    function norm(s){ return (s||'').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
+    // La Paz neighborhoods, each with an approximate center. A lot is assigned to
+    // the NEAREST center by its GPS coordinates — reliable regardless of how the
+    // address was typed. Centers are approximate and easy to fine-tune.
+    // (A future operator/admin `zone` field, when set on a lot, overrides this.)
+    var ZONES = [
+      { name:'Centro',            lat:-16.4960, lng:-68.1336 },
+      { name:'San Pedro',         lat:-16.5075, lng:-68.1345 },
+      { name:'San Jorge',         lat:-16.5030, lng:-68.1290 },
+      { name:'Sopocachi',         lat:-16.5115, lng:-68.1280 },
+      { name:'Miraflores',        lat:-16.4995, lng:-68.1190 },
+      { name:'Obrajes',           lat:-16.5270, lng:-68.1030 },
+      { name:'Calacoto',          lat:-16.5400, lng:-68.0880 },
+      { name:'San Miguel',        lat:-16.5465, lng:-68.0770 },
+      { name:'Irpavi / Achumani', lat:-16.5430, lng:-68.0630 },
+      { name:'Cota Cota',         lat:-16.5560, lng:-68.0680 },
+      { name:'El Alto',           lat:-16.5040, lng:-68.1630 }
+    ];
+    var KX = 0.9588;            // cos(16.5°): scale longitude so distances are fair
+    var MAX_D2 = 0.05 * 0.05;   // ~5.5 km: farther than this from every center → "Otras zonas"
     function setNum(id,v){ var el=document.getElementById(id); if(el) el.textContent=v; }
     function free(l){ return Math.max(0,(l.total||0)-(l.occupied||0)); }
     function hide(){ var s=document.getElementById('cifras'); if(s) s.style.display='none'; }
+    function zoneOf(l){
+      if (l.zone) return l.zone; // explicit override (future dropdown) wins
+      if (typeof l.lat !== 'number' || typeof l.lng !== 'number') return 'Otras zonas';
+      var best='Otras zonas', bestD=Infinity;
+      for (var i=0;i<ZONES.length;i++){
+        var dlat=l.lat-ZONES[i].lat, dlng=(l.lng-ZONES[i].lng)*KX, d=dlat*dlat+dlng*dlng;
+        if (d<bestD){ bestD=d; best=ZONES[i].name; }
+      }
+      return bestD<=MAX_D2 ? best : 'Otras zonas';
+    }
     fetch('/api/state').then(function(r){ return r.ok?r.json():null; }).then(function(j){
       if(!j||!j.state||!Array.isArray(j.state.lots)){ hide(); return; }
       var lots = j.state.lots.filter(function(l){ return l && l.status==='approved'; });
@@ -399,15 +426,12 @@
       setNum('stat-lots', std.length);
       setNum('stat-refs', refs.length);
       setNum('stat-free', std.reduce(function(a,l){ return a+free(l); },0));
-      // Available spots grouped by zone (zone inferred from name/address).
-      var byZone={}, order=[];
-      std.forEach(function(l){
-        var hay=norm(l.name)+' '+norm(l.address), zone=null;
-        for(var i=0;i<ZONES.length;i++){ if(hay.indexOf(norm(ZONES[i]))!==-1){ zone=ZONES[i]; break; } }
-        if(!zone) zone='Otras zonas';
-        if(!(zone in byZone)){ byZone[zone]=0; order.push(zone); }
-        byZone[zone]+=free(l);
-      });
+      // Free spots grouped by neighborhood (assigned by GPS). Show only zones that
+      // actually have a lot, ordered by the ZONES list (with "Otras zonas" last).
+      var byZone={};
+      std.forEach(function(l){ var z=zoneOf(l); byZone[z]=(byZone[z]||0)+free(l); });
+      var order=ZONES.map(function(z){ return z.name; }).concat(['Otras zonas'])
+                     .filter(function(z){ return z in byZone; });
       var grid=document.getElementById('zone-grid');
       if(grid){
         grid.innerHTML = order.length
