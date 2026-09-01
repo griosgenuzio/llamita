@@ -140,6 +140,19 @@
     .eyebrow { font-family:var(--mono); font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:0 0 10px; }
     h2.title { font-size:30px; line-height:1.15; margin:0 0 12px; letter-spacing:-.01em; }
     p.lead { font-size:17px; line-height:1.6; color:var(--ink); max-width:620px; margin:0; }
+    /* Live stats (value section below hero) */
+    .livedot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--avail); margin-right:6px; vertical-align:middle; animation:blink 1.4s ease-in-out infinite; }
+    .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-top:30px; }
+    .stat { background:radial-gradient(120% 120% at 80% -10%, #0A4433 0%, #052E22 60%); color:#fff; border-radius:18px; padding:26px 24px; }
+    .stat .num { font-size:44px; font-weight:700; line-height:1; letter-spacing:-.02em; color:var(--lima); font-family:var(--mono); }
+    .stat .lbl { margin-top:10px; font-size:14.5px; color:rgba(255,255,255,.82); }
+    .zonestats { margin-top:20px; background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px 26px; }
+    .zonegrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; }
+    .zonecard { display:flex; align-items:baseline; justify-content:space-between; gap:8px; background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:12px 14px; }
+    .zonecard .z { font-size:14px; color:var(--ink); font-weight:500; }
+    .zonecard .c { font-family:var(--mono); font-weight:700; font-size:19px; color:var(--avail); }
+    .zonecard.full .c { color:var(--full); }
+    @media (max-width:560px){ .stat { padding:18px 14px; } .stat .num { font-size:30px; } .stat .lbl { font-size:12px; } }
     .steps { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:34px; }
     .step { background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:24px; }
     .step .ic { width:46px; height:46px; border-radius:12px; background:rgba(5,46,34,.06); display:flex; align-items:center; justify-content:center; margin-bottom:14px; }
@@ -197,7 +210,7 @@
     <div class="wrap row">
       <a href="/" aria-label="Llamita — inicio"><img src="/assets/brand/logo-horizontal.png" alt="Llamita — parqueos en La Paz"></a>
       <nav class="links">
-        <a class="hide-sm" href="#como">Cómo funciona</a>
+        <a class="hide-sm" href="#cifras">En vivo</a>
         <a class="hide-sm" href="/parqueos-la-paz">Parqueos</a>
         <a class="hide-sm" href="#operadores">Para operadores</a>
         <a class="btn btn-dark cta-sm" href="/app">Abrir el mapa</a>
@@ -210,13 +223,12 @@
     <div class="wrap grid">
       <div>
         <span class="badge"><span style="width:7px;height:7px;border-radius:50%;background:var(--lima);display:inline-block"></span>La Paz · El Alto · en vivo</span>
-        <h1>Encuentra parqueo en La Paz, <em>en tiempo real</em>.</h1>
-        <p class="sub">Deja de dar vueltas. Llamita te muestra en un mapa en vivo qué parqueos y estacionamientos tienen espacio libre <strong>ahora mismo</strong> — y cuáles están llenos.</p>
+        <h1>Encuentra parqueo en La Paz <em>al instante</em></h1>
+        <p class="sub">Deja de dar vueltas. Llamita te muestra en un mapa en vivo qué parqueos y estacionamientos tienen espacio libre <strong>ahora mismo</strong>.</p>
         <div class="actions">
-          <a class="btn btn-lima" href="/app">Ver el mapa en vivo →</a>
+          <a class="btn btn-lima" href="/app">Encuentra parqueo →</a>
           <a class="btn btn-ghost" href="#operadores">Tengo un parqueo</a>
         </div>
-        <p class="trust">Gratis para conductores · Sin instalar nada · Disponibilidad al instante</p>
       </div>
 
       <!-- Live-map illustration (pure CSS/SVG, no dependencies) -->
@@ -252,27 +264,21 @@
     </div>
   </section>
 
-  <!-- HOW IT WORKS -->
-  <section class="block" id="como">
+  <!-- LIVE VALUE / STATS -->
+  <section class="block" id="cifras">
     <div class="wrap">
-      <p class="eyebrow">Cómo funciona</p>
-      <h2 class="title">Tres pasos, cero vueltas</h2>
-      <p class="lead">Los operadores actualizan su disponibilidad en vivo. Lo que ves en el mapa es el estado real del parqueo, no un dato de hace horas.</p>
-      <div class="steps">
-        <div class="step">
-          <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#052E22" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0Z"/><circle cx="12" cy="10" r="3"/></svg></div>
-          <h3>1 · Abre el mapa</h3>
-          <p>Entra desde tu celular o computadora. No necesitas instalar ninguna app.</p>
-        </div>
-        <div class="step">
-          <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#052E22" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
-          <h3>2 · Mira los cupos</h3>
-          <p>Verde = hay espacio libre. Rojo = lleno. Actualizado al instante por cada operador.</p>
-        </div>
-        <div class="step">
-          <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#052E22" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17h14M6 17l1.5-5A2 2 0 0 1 9.4 10.6h5.2a2 2 0 0 1 1.9 1.4L18 17M7 17v2M17 17v2"/><circle cx="8" cy="13.5" r=".5" fill="#052E22"/></svg></div>
-          <h3>3 · Ve directo</h3>
-          <p>Elige el parqueo con espacio y llega sin perder tiempo buscando.</p>
+      <p class="eyebrow"><span class="livedot"></span> La Paz · en vivo</p>
+      <h2 class="title">Parqueo real, ahora mismo</h2>
+      <p class="lead">Lo que hay disponible en la ciudad en este momento — actualizado al instante por cada operador.</p>
+      <div class="stats">
+        <div class="stat"><div class="num" id="stat-lots">—</div><div class="lbl">Parqueos publicados</div></div>
+        <div class="stat"><div class="num" id="stat-refs">—</div><div class="lbl">Puntos de referencia</div></div>
+        <div class="stat"><div class="num" id="stat-free">—</div><div class="lbl">Cupos libres ahora</div></div>
+      </div>
+      <div class="zonestats">
+        <p class="eyebrow" style="margin:0 0 14px">Cupos libres por zona</p>
+        <div class="zonegrid" id="zone-grid">
+          <div style="color:var(--muted);font-size:14px">Cargando cupos en vivo…</div>
         </div>
       </div>
     </div>
@@ -376,4 +382,39 @@
     </div>
   </footer>
   <script>document.getElementById('yr').textContent=new Date().getFullYear();</script>
+
+  <!-- Live stats: pull the shared state and show real coverage/availability. -->
+  <script>
+  (function(){
+    var ZONES = ['Centro','San Pedro','Sopocachi','Miraflores','San Miguel','Calacoto','Obrajes','Cota Cota','El Alto','Zona Sur'];
+    function norm(s){ return (s||'').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
+    function setNum(id,v){ var el=document.getElementById(id); if(el) el.textContent=v; }
+    function free(l){ return Math.max(0,(l.total||0)-(l.occupied||0)); }
+    function hide(){ var s=document.getElementById('cifras'); if(s) s.style.display='none'; }
+    fetch('/api/state').then(function(r){ return r.ok?r.json():null; }).then(function(j){
+      if(!j||!j.state||!Array.isArray(j.state.lots)){ hide(); return; }
+      var lots = j.state.lots.filter(function(l){ return l && l.status==='approved'; });
+      var std  = lots.filter(function(l){ return l.kind!=='reference'; });
+      var refs = lots.filter(function(l){ return l.kind==='reference'; });
+      setNum('stat-lots', std.length);
+      setNum('stat-refs', refs.length);
+      setNum('stat-free', std.reduce(function(a,l){ return a+free(l); },0));
+      // Available spots grouped by zone (zone inferred from name/address).
+      var byZone={}, order=[];
+      std.forEach(function(l){
+        var hay=norm(l.name)+' '+norm(l.address), zone=null;
+        for(var i=0;i<ZONES.length;i++){ if(hay.indexOf(norm(ZONES[i]))!==-1){ zone=ZONES[i]; break; } }
+        if(!zone) zone='Otras zonas';
+        if(!(zone in byZone)){ byZone[zone]=0; order.push(zone); }
+        byZone[zone]+=free(l);
+      });
+      var grid=document.getElementById('zone-grid');
+      if(grid){
+        grid.innerHTML = order.length
+          ? order.map(function(z){ var c=byZone[z]; return '<div class="zonecard'+(c===0?' full':'')+'"><span class="z">'+z+'</span><span class="c">'+c+'</span></div>'; }).join('')
+          : '<div style="color:var(--muted);font-size:14px">Sumando parqueos en la ciudad…</div>';
+      }
+    }).catch(hide);
+  })();
+  </script>
 </body></html>
