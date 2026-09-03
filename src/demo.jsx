@@ -29,31 +29,6 @@ function today() {
 }
 const flatFees = (firstHour, addHour, dailyCap) => ({ firstHour, addHour, weekendMult: 1, peakMult: 1, peakHours: '', dailyCap });
 
-// Driver view: a spread of parqueos across zones, with varied availability.
-function driverSeed() {
-  const lots = [
-    { name: 'Parqueo Plaza Avaroa', address: 'Av. 20 de Octubre, Sopocachi', lat: -16.5108, lng: -68.1283, total: 40, occupied: 26,
-      covered: 'mixto', keyRequired: 'no', motos: true, security: ['Cámaras', 'Guardia'], payment: ['Efectivo', 'QR'],
-      hoursWeek: '07:00 – 23:00', hoursWeekend: '08:00 – 23:00', fees: flatFees(6, 4, 45) },
-    { name: 'Parqueo San Miguel', address: 'Calle 21, San Miguel', lat: -16.5460, lng: -68.0775, total: 30, occupied: 30,
-      covered: 'techado', keyRequired: 'opcional', motos: false, security: ['Cámaras'], payment: ['Efectivo', 'QR', 'Tarjeta'],
-      hoursWeek: '08:00 – 22:00', hoursWeekend: '09:00 – 22:00', fees: flatFees(7, 5, 50) },
-    { name: 'Parqueo Estadio Miraflores', address: 'Av. Busch, Miraflores', lat: -16.4990, lng: -68.1195, total: 55, occupied: 12,
-      covered: 'descubierto', keyRequired: 'no', motos: true, security: ['Guardia'], payment: ['Efectivo'],
-      hoursWeek: '06:00 – 22:00', hoursWeekend: 'Días de partido', fees: flatFees(5, 3, 35) },
-    { name: 'Parqueo Camacho Centro', address: 'Av. Camacho, Centro', lat: -16.4975, lng: -68.1330, total: 25, occupied: 21,
-      covered: 'techado', keyRequired: 'obligatoria', motos: false, security: ['Cámaras', 'Guardia', 'Iluminación'], payment: ['Efectivo', 'QR', 'Tarjeta'],
-      hoursWeek: '07:00 – 20:00', hoursWeekend: 'Cerrado', fees: flatFees(8, 5, 55) },
-    { name: 'Parqueo Ballivián', address: 'Av. Ballivián, Calacoto', lat: -16.5405, lng: -68.0875, total: 35, occupied: 9,
-      covered: 'mixto', keyRequired: 'no', motos: true, security: ['Cámaras'], payment: ['Efectivo', 'QR'],
-      hoursWeek: '07:00 – 22:00', hoursWeekend: '08:00 – 21:00', fees: flatFees(6, 4, 45) },
-    { name: 'Parqueo Obrajes', address: 'Av. 14 de Septiembre, Obrajes', lat: -16.5270, lng: -68.1035, total: 20, occupied: 19,
-      covered: 'descubierto', keyRequired: 'no', motos: false, security: ['Iluminación'], payment: ['Efectivo'],
-      hoursWeek: '07:00 – 21:00', hoursWeekend: '08:00 – 20:00', fees: flatFees(5, 3, 30) },
-  ].map((l, i) => Object.assign({ id: 'demo-lot-' + (i + 1), ownerId: 'demo-op', status: 'approved', kind: 'standard', terrain: 'pavimentado', photoIds: [], createdAt: new Date().toISOString() }, l));
-  return { lots, sessions: [], history: [] };
-}
-
 // Operator view: two lots owned by the demo operator, some cars parked now, and
 // a sales registry for today so every tab looks alive.
 function operatorSeed() {
@@ -152,9 +127,10 @@ function installDemoApi() {
 }
 
 // ─────────── Demo shells ───────────
-function DemoDriver() {
-  const store = useDemoStore(React.useMemo(driverSeed, []));
-  const session = { id: 'demo-driver', name: 'Conductor demo', email: 'demo@llamita.bo', initials: 'CD', role: 'conductor' };
+// Driver view: the REAL driver app on the REAL shared store (real lots/volume),
+// so it's a faithful showcase for drivers. Writes are still shielded by the shim.
+function DemoDriver({ store }) {
+  const session = { id: 'demo-driver', name: 'Conductor', email: '', initials: 'C', role: 'conductor' };
   return <DriverApp store={store} session={session} onSignOut={function () {}} />;
 }
 
@@ -165,7 +141,7 @@ function DemoOperator() {
 }
 
 // ─────────── Overlay (framed, with a DEMO banner + close) ───────────
-function DemoOverlay({ view, onClose }) {
+function DemoOverlay({ view, store, onClose }) {
   // Install the shim during the first render (before the child views mount), so
   // even their mount-time calls can't reach a write endpoint. Restore on close.
   const [restore] = React.useState(function () { return installDemoApi(); });
@@ -175,24 +151,29 @@ function DemoOverlay({ view, onClose }) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
+  const isMobile = D.useIsMobile();
 
-  const label = view === 'driver' ? 'Vista del conductor' : 'Vista del operador';
+  const isDriver = view === 'driver';
+  const label = isDriver ? 'Vista del conductor' : 'Vista del operador';
+  // The driver view is real data; the operator view is a mock. Only the mock
+  // carries the "sample data" note.
+  const note = isDriver ? 'datos reales, en vivo' : 'datos de ejemplo';
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: 'var(--c-bg)', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ height: 44, flexShrink: 0, background: 'var(--c-accent)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px 0 16px' }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-          <span style={{ background: 'var(--c-lime)', color: 'var(--c-accent)', fontWeight: 700, borderRadius: 5, padding: '2px 7px', letterSpacing: '0.1em' }}>DEMO</span>
-          {label}
-          <span style={{ opacity: 0.7, textTransform: 'none', letterSpacing: 0 }}>· datos de ejemplo, no se guarda nada</span>
+      <div style={{ height: 46, flexShrink: 0, background: 'var(--c-accent)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '0 10px 0 14px' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 0, fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', overflow: 'hidden' }}>
+          <span style={{ flexShrink: 0, background: 'var(--c-lime)', color: 'var(--c-accent)', fontWeight: 700, borderRadius: 5, padding: '2px 7px', letterSpacing: '0.1em' }}>DEMO</span>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+          <span style={{ flexShrink: 0, opacity: 0.7, textTransform: 'none', letterSpacing: 0 }}>· {note}</span>
         </span>
         <button onClick={onClose} style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.14)',
-          border: '1px solid rgba(255,255,255,0.25)', color: '#fff', borderRadius: 8,
-          padding: '6px 12px', fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-        }}>✕ Cerrar demo</button>
+          flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.14)',
+          border: '1px solid rgba(255,255,255,0.28)', color: '#fff', borderRadius: 8,
+          padding: '7px 12px', fontFamily: 'var(--font-sans)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+        }}>✕ {isMobile ? 'Cerrar' : 'Cerrar demo'}</button>
       </div>
       <div className="llamita-demo-fit" style={{ flex: 1, minHeight: 0 }}>
-        {view === 'driver' ? <DemoDriver /> : <DemoOperator />}
+        {isDriver ? <DemoDriver store={store} /> : <DemoOperator />}
       </div>
     </div>
   );
