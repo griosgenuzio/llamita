@@ -20,7 +20,7 @@ import esbuild from 'esbuild';
 // list in sync with the <script> tags in index.html.
 const modules = [
   'api', 'analytics', 'auth', 'data',
-  'map-leaflet', 'driver', 'owner', 'admin', 'main',
+  'map-leaflet', 'driver', 'owner', 'admin', 'demo', 'main',
 ];
 
 await esbuild.build({

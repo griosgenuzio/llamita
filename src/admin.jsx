@@ -478,6 +478,7 @@ function AdminApp({ store, session, onSignOut }) {
 
   var [roleFilter, setRoleFilter] = React.useState('todos');
   var [period, setPeriod]         = React.useState('todos');
+  var [demoView, setDemoView]     = React.useState(null); // 'driver' | 'operador' | null
   // Accounts deleted this session — hidden immediately until the 10 s poll drops
   // them from /api/users too.
   var [deletedIds, setDeletedIds] = React.useState({});
@@ -556,6 +557,9 @@ function AdminApp({ store, session, onSignOut }) {
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--c-bg)', fontFamily: 'var(--font-sans)', color: '#111', fontSize: 13 }}>
+      {demoView && window.LlamitaDemo && (
+        <window.LlamitaDemo.DemoOverlay view={demoView} onClose={function() { setDemoView(null); }} />
+      )}
       {/* Header */}
       <div style={{ padding: isMobile ? '9px 12px' : '11px 20px', borderBottom: '1px solid #eee', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
@@ -581,6 +585,31 @@ function AdminApp({ store, session, onSignOut }) {
           <AdmStat label={'Usos efectivos (' + (period === 'todos' ? 'total' : period) + ')'} value={effectiveInPeriod.length}
             sub={effectiveInPeriod.filter(function(e){return e.role==='conductor';}).length + ' de conductores · ' + effectiveInPeriod.filter(function(e){return e.role==='operador';}).length + ' de operadores'} />
           <AdmStat label="Eventos registrados" value={events.length} sub="máx. 5000 · los más antiguos rotan" />
+        </div>
+
+        {/* Demo / sales views — static (mock data), open the real driver & operator UIs */}
+        <div style={{ background: 'var(--c-accent)', borderRadius: 12, padding: isMobile ? '14px 16px' : '16px 20px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ background: 'var(--c-lime)', color: 'var(--c-accent)', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, borderRadius: 5, padding: '2px 7px', letterSpacing: '0.1em' }}>DEMO</span>
+              <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#fff' }}>Vistas para mostrar el producto</h3>
+            </div>
+            <p style={{ margin: '6px 0 0', fontSize: 12.5, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5 }}>
+              Abre la app del conductor o el panel del operador con datos de ejemplo. Nada se guarda: no crea cuentas ni parqueos reales.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+            <button onClick={function() { setDemoView('driver'); }} style={{
+              padding: '10px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.25)',
+              background: 'rgba(255,255,255,0.12)', color: '#fff', fontFamily: 'var(--font-sans)',
+              fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+            }}>🚗 Vista del conductor</button>
+            <button onClick={function() { setDemoView('operador'); }} style={{
+              padding: '10px 16px', borderRadius: 10, border: 'none',
+              background: 'var(--c-lime)', color: 'var(--c-accent)', fontFamily: 'var(--font-sans)',
+              fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+            }}>🅿️ Vista del operador</button>
+          </div>
         </div>
 
         {/* Device mix at login */}
